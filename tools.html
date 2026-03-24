@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Herramientas — AlphaChainBots</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--blue:#1560d4;--bb:#3b82f6;--green:#22c55e;--red:#ef4444;--bdr:rgba(255,255,255,0.08);--sf:rgba(255,255,255,0.04);--sf2:rgba(255,255,255,0.07)}
+body{background:#030712;color:#fff;font-family:'Inter',system-ui,sans-serif;font-size:16px;line-height:1.6;overflow-x:hidden}
+a{text-decoration:none;color:inherit}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:66px;border-bottom:1px solid var(--bdr);background:rgba(3,7,18,0.95);backdrop-filter:blur(20px);position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px}
+.nl{display:flex;gap:24px}
+.nl a{font-size:14px;color:rgba(255,255,255,0.5)}
+.nl a:hover,.nl a.active{color:#fff}
+.nl a.active{font-weight:600}
+.bng{font-size:14px;color:rgba(255,255,255,0.55);padding:8px 16px;border-radius:8px;border:1px solid var(--bdr)}
+.bns{background:var(--blue);color:#fff;font-size:14px;padding:9px 18px;border-radius:8px;font-weight:600}
+.ph{padding:52px 48px 40px;text-align:center;background:rgba(59,130,246,0.05);border-bottom:1px solid var(--bdr)}
+.ey{display:inline-block;background:rgba(59,130,246,0.15);color:#60a5fa;font-size:11px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;padding:5px 14px;border-radius:100px;margin-bottom:14px}
+.ph h1{font-size:38px;font-weight:900;letter-spacing:-1.4px;margin-bottom:10px}
+.ph p{font-size:15px;color:rgba(255,255,255,0.4);max-width:480px;margin:0 auto}
+.sec{padding:56px 48px;max-width:1200px;margin:0 auto}
+footer{border-top:1px solid var(--bdr);padding:28px 48px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.fll{display:flex;gap:18px;flex-wrap:wrap}
+.fll a{font-size:12px;color:rgba(255,255,255,0.35)}
+.fll a:hover{color:#fff}
+.fcp{font-size:12px;color:rgba(255,255,255,0.2)}
+.pill{display:inline-block;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:700}
+.pl{background:rgba(34,197,94,0.13);color:#4ade80}
+.ps{background:rgba(251,191,36,0.13);color:#fbbf24}
+.pw{background:rgba(34,197,94,0.13);color:#4ade80}
+.px{background:rgba(239,68,68,0.13);color:#f87171}
+.po{background:rgba(59,130,246,0.13);color:#60a5fa}
+.up{color:var(--green);font-weight:700}.dn{color:var(--red);font-weight:700}
+.dim{color:rgba(255,255,255,0.28);font-size:13px}
+@media(max-width:860px){.nav{padding:0 20px}.nl{display:none}.sec{padding:36px 20px}.ph{padding:40px 20px 28px}footer{padding:20px}}
+
+.tg{display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:1100px;margin:40px auto 72px;padding:0 48px}
+.tc{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:26px}
+.tc:hover{border-color:rgba(59,130,246,0.3)}
+.tt{font-size:17px;font-weight:800;letter-spacing:-0.4px;margin-bottom:5px}
+.td{font-size:13px;color:rgba(255,255,255,0.38);margin-bottom:20px;line-height:1.6}
+.f{margin-bottom:12px}
+.f label{display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,0.45);margin-bottom:5px;letter-spacing:0.3px}
+.f input,.f select{width:100%;padding:9px 12px;border:1px solid rgba(255,255,255,0.1);border-radius:8px;font-size:14px;color:#fff;background:rgba(255,255,255,0.06);outline:none;font-family:inherit}
+.f input:focus,.f select:focus{border-color:rgba(59,130,246,0.5)}
+.f select option{background:#0f172a}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rb{margin-top:16px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.14);border-radius:10px;padding:16px}
+.rg{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rl{font-size:11px;color:rgba(255,255,255,0.38);margin-bottom:3px}
+.rv{font-size:19px;font-weight:800;letter-spacing:-0.4px}
+.g{color:#22c55e}.b{color:#60a5fa}.r{color:#ef4444}
+.dv{height:1px;background:rgba(255,255,255,0.07);margin:12px 0}
+.rm{height:6px;border-radius:3px;background:rgba(255,255,255,0.06);overflow:hidden;margin-top:8px}
+.rmf{height:100%;border-radius:3px;transition:width 0.4s}
+.tip{font-size:12px;color:rgba(255,255,255,0.38);margin-top:8px;line-height:1.6}
+@media(max-width:860px){.tg{grid-template-columns:1fr;padding:0 20px}.fr{grid-template-columns:1fr}}
+
+</style>
+</head>
+<body><nav class="nav"><a href="index.html" class="logo"><svg width="30" height="30" viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="9" fill="#1560d4"/><rect x="7" y="24" width="4" height="7" rx="1.5" fill="white" opacity="0.35"/><rect x="7" y="20" width="4" height="3.5" rx="1" fill="white"/><rect x="13" y="17" width="4" height="14" rx="1.5" fill="white" opacity="0.35"/><rect x="13" y="12" width="4" height="4.5" rx="1" fill="white"/><rect x="19" y="22" width="4" height="9" rx="1.5" fill="#4ade80" opacity="0.35"/><rect x="19" y="16" width="4" height="5.5" rx="1" fill="#4ade80"/><rect x="25" y="19" width="4" height="12" rx="1.5" fill="#4ade80" opacity="0.35"/><rect x="25" y="13" width="4" height="5.5" rx="1" fill="#4ade80"/><path d="M9 23L15 16L21 20L27 14" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/></svg><div style="line-height:1.1"><span style="font-size:15px;font-weight:800;letter-spacing:-0.3px">AlphaChain</span><br><span style="font-size:9px;letter-spacing:1.8px;color:rgba(255,255,255,0.35);text-transform:uppercase;font-weight:600">Bots</span></div></a><div class="nl"><a href="index.html">Inicio</a>
+<a href="stats.html">Track record</a>
+<a href="charts.html">Charts</a>
+<a href="tools.html" class='active'>Herramientas</a>
+<a href="precios.html">Precios</a>
+<a href="faq.html">FAQ</a></div><div style="display:flex;gap:8px"><a href="#" class="bng">Iniciar sesión</a><a href="#" class="bns">Empezar gratis</a></div></nav>
+<div class="ph"><div class="ey">Herramientas gratuitas</div><h1>Opera con precisión</h1><p>Calculadoras profesionales para gestionar tu riesgo. Sin registro, completamente gratis.</p></div>
+<div class="tg">
+  <div class="tc">
+    <div class="tt">Calculadora de posición</div>
+    <p class="td">Tamaño óptimo según capital y riesgo por operación.</p>
+    <div class="f"><label>Capital total ($)</label><input type="number" id="c1" value="10000" oninput="cP()"></div>
+    <div class="fr"><div class="f"><label>Riesgo (%)</label><input type="number" id="c2" value="1" step="0.1" oninput="cP()"></div><div class="f"><label>Apalancamiento (x)</label><input type="number" id="c3" value="5" oninput="cP()"></div></div>
+    <div class="fr"><div class="f"><label>Entrada</label><input type="number" id="c4" value="83000" oninput="cP()"></div><div class="f"><label>Stop Loss</label><input type="number" id="c5" value="81500" oninput="cP()"></div></div>
+    <div class="rb"><div class="rg"><div><div class="rl">Tamaño posición</div><div class="rv b" id="rp">—</div></div><div><div class="rl">Pérdida máx</div><div class="rv r" id="rl">—</div></div><div><div class="rl">Margen</div><div class="rv" id="rm">—</div></div><div><div class="rl">% capital</div><div class="rv" id="rpc">—</div></div></div><div class="dv"></div><div class="rl">Nivel de riesgo</div><div class="rm"><div class="rmf" id="rmf" style="width:0%"></div></div><div class="tip" id="rt"></div></div>
+  </div>
+  <div class="tc">
+    <div class="tt">Calculadora de liquidación</div>
+    <p class="td">Precio exacto de liquidación y margen de seguridad.</p>
+    <div class="f"><label>Dirección</label><select id="l1" onchange="cL()"><option value="long">Long</option><option value="short">Short</option></select></div>
+    <div class="fr"><div class="f"><label>Entrada</label><input type="number" id="l2" value="83000" oninput="cL()"></div><div class="f"><label>Apalancamiento (x)</label><input type="number" id="l3" value="10" oninput="cL()"></div></div>
+    <div class="fr"><div class="f"><label>Margen ($)</label><input type="number" id="l4" value="1000" oninput="cL()"></div><div class="f"><label>Mant. (%)</label><input type="number" id="l5" value="0.5" step="0.1" oninput="cL()"></div></div>
+    <div class="rb"><div class="rg"><div><div class="rl">Precio liq.</div><div class="rv r" id="lp">—</div></div><div><div class="rl">Distancia</div><div class="rv" id="ld">—</div></div><div><div class="rl">Posición</div><div class="rv b" id="ls">—</div></div><div><div class="rl">Margen seguro</div><div class="rv g" id="lsf">—</div></div></div><div class="dv"></div><div class="rl">Distancia a liquidación</div><div class="rm"><div class="rmf" id="lmf" style="width:0%"></div></div><div class="tip" id="lt"></div></div>
+  </div>
+  <div class="tc">
+    <div class="tt">Calculadora de P&L</div>
+    <p class="td">Beneficio o pérdida potencial antes de entrar.</p>
+    <div class="f"><label>Dirección</label><select id="p1" onchange="cPL()"><option value="long">Long</option><option value="short">Short</option></select></div>
+    <div class="fr"><div class="f"><label>Entrada</label><input type="number" id="p2" value="83000" oninput="cPL()"></div><div class="f"><label>Take Profit</label><input type="number" id="p3" value="86500" oninput="cPL()"></div></div>
+    <div class="fr"><div class="f"><label>Stop Loss</label><input type="number" id="p4" value="81500" oninput="cPL()"></div><div class="f"><label>Tamaño ($)</label><input type="number" id="p5" value="5000" oninput="cPL()"></div></div>
+    <div class="rb"><div class="rg"><div><div class="rl">Beneficio</div><div class="rv g" id="pp">—</div></div><div><div class="rl">Pérdida</div><div class="rv r" id="plo">—</div></div><div><div class="rl">% beneficio</div><div class="rv g" id="ppc">—</div></div><div><div class="rl">Ratio R:R</div><div class="rv b" id="prr">—</div></div></div><div class="tip" id="pt"></div></div>
+  </div>
+  <div class="tc">
+    <div class="tt">Conversor cripto / fiat</div>
+    <p class="td">Convierte entre criptos y monedas fiat.</p>
+    <div class="f"><label>Cantidad</label><input type="number" id="v1" value="1" oninput="cV()"></div>
+    <div class="fr"><div class="f"><label>De</label><select id="v2" onchange="cV()"><option value="btc">BTC</option><option value="eth">ETH</option><option value="sol">SOL</option><option value="usd">USD</option><option value="eur">EUR</option></select></div><div class="f"><label>A</label><select id="v3" onchange="cV()"><option value="usd">USD</option><option value="eur">EUR</option><option value="btc">BTC</option><option value="eth">ETH</option><option value="sol">SOL</option></select></div></div>
+    <div class="rb"><div><div class="rl">Resultado</div><div class="rv b" id="vr" style="font-size:24px">—</div></div><div class="dv"></div><div class="rg"><div><div class="rl">BTC</div><div class="rv" id="vb" style="font-size:14px">$83,420</div></div><div><div class="rl">ETH</div><div class="rv" id="ve" style="font-size:14px">$1,960</div></div><div><div class="rl">SOL</div><div class="rv" id="vs" style="font-size:14px">$124.80</div></div><div><div class="rl">EUR/USD</div><div class="rv" style="font-size:14px">1.085</div></div></div><div class="tip">Precios de referencia. Usa precios en tiempo real para operar.</div></div>
+  </div>
+</div>
+<footer><a href="index.html" class="logo"><svg width="30" height="30" viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="9" fill="#1560d4"/><rect x="7" y="24" width="4" height="7" rx="1.5" fill="white" opacity="0.35"/><rect x="7" y="20" width="4" height="3.5" rx="1" fill="white"/><rect x="13" y="17" width="4" height="14" rx="1.5" fill="white" opacity="0.35"/><rect x="13" y="12" width="4" height="4.5" rx="1" fill="white"/><rect x="19" y="22" width="4" height="9" rx="1.5" fill="#4ade80" opacity="0.35"/><rect x="19" y="16" width="4" height="5.5" rx="1" fill="#4ade80"/><rect x="25" y="19" width="4" height="12" rx="1.5" fill="#4ade80" opacity="0.35"/><rect x="25" y="13" width="4" height="5.5" rx="1" fill="#4ade80"/><path d="M9 23L15 16L21 20L27 14" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/></svg><div style="line-height:1.1"><span style="font-size:15px;font-weight:800;letter-spacing:-0.3px">AlphaChain</span><br><span style="font-size:9px;letter-spacing:1.8px;color:rgba(255,255,255,0.35);text-transform:uppercase;font-weight:600">Bots</span></div></a><div class="fll"><a href="index.html">Inicio</a><a href="stats.html">Track record</a><a href="charts.html">Charts</a><a href="tools.html">Herramientas</a><a href="precios.html">Precios</a><a href="legal.html">Legal</a><a href="faq.html">FAQ</a></div><span class="fcp">© 2026 AlphaChainBots</span></footer><div style="padding:12px 48px;border-top:1px solid var(--bdr)"><p style="font-size:11px;color:rgba(255,255,255,0.18);max-width:1200px;margin:0 auto">⚠ Aviso de riesgo: El trading de criptomonedas conlleva riesgo sustancial de pérdida. Las señales son informativas y no constituyen asesoramiento financiero.</p></div>
+<script>
+const pr={btc:83420,eth:1960,sol:124.80,usd:1,eur:1/1.085};
+async function fp(){try{const d=await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT').then(r=>r.json());pr.btc=+d.price;document.getElementById('vb').textContent='$'+Math.round(pr.btc).toLocaleString();cV();}catch(e){}}
+fp();
+function cP(){const cap=+document.getElementById('c1').value,risk=+document.getElementById('c2').value,lev=+document.getElementById('c3').value||1,en=+document.getElementById('c4').value,sl=+document.getElementById('c5').value;if(!cap||!en||!sl)return;const mx=cap*risk/100,sp=Math.abs((en-sl)/en)*100,sz=sp?mx/(sp/100):0,mg=sz/lev,pc=mg/cap*100;document.getElementById('rp').textContent='$'+sz.toFixed(0);document.getElementById('rl').textContent='-$'+mx.toFixed(0);document.getElementById('rm').textContent='$'+mg.toFixed(0);document.getElementById('rpc').textContent=pc.toFixed(1)+'%';const col=risk<=1?'#22c55e':risk<=2?'#f59e0b':'#ef4444';document.getElementById('rmf').style.width=Math.min(risk/3*100,100)+'%';document.getElementById('rmf').style.background=col;document.getElementById('rt').textContent=risk<=1?'Riesgo conservador. Ideal para consistencia a largo plazo.':risk<=2?'Riesgo moderado. Solo en setups de alta calidad.':'Riesgo alto. Reduce tamaño o ajusta el stop.';}
+function cL(){const dir=document.getElementById('l1').value,en=+document.getElementById('l2').value,lev=+document.getElementById('l3').value||1,mg=+document.getElementById('l4').value,mt=+document.getElementById('l5').value||0.5;if(!en||!mg)return;const sz=mg*lev,lp=dir==='long'?en*(1-1/lev+mt/100):en*(1+1/lev-mt/100),dist=Math.abs((en-lp)/en)*100,sf=mg-sz*mt/100;document.getElementById('lp').textContent='$'+lp.toFixed(0);document.getElementById('ld').textContent=dist.toFixed(2)+'%';document.getElementById('ls').textContent='$'+sz.toFixed(0);document.getElementById('lsf').textContent='$'+sf.toFixed(0);const col=dist>=10?'#22c55e':dist>=5?'#f59e0b':'#ef4444';document.getElementById('lmf').style.width=Math.min(dist/20*100,100)+'%';document.getElementById('lmf').style.background=col;document.getElementById('lt').textContent=dist>=10?'Distancia segura. Margen suficiente.':dist>=5?'Distancia moderada. Vigila el precio.':'Peligro: muy cerca de liquidación.';}
+function cPL(){const dir=document.getElementById('p1').value,en=+document.getElementById('p2').value,tp=+document.getElementById('p3').value,sl=+document.getElementById('p4').value,sz=+document.getElementById('p5').value;if(!en||!tp||!sl||!sz)return;const pp=dir==='long'?(tp-en)/en*100:(en-tp)/en*100,lp=dir==='long'?(en-sl)/en*100:(sl-en)/en*100,pr2=sz*pp/100,lo=sz*lp/100,rr=lp?pp/lp:0;document.getElementById('pp').textContent='+$'+pr2.toFixed(0);document.getElementById('plo').textContent='-$'+lo.toFixed(0);document.getElementById('ppc').textContent='+'+pp.toFixed(2)+'%';document.getElementById('prr').textContent=rr.toFixed(2)+':1';document.getElementById('pt').textContent=rr>=2?'Excelente R:R. Ventaja matemática clara.':rr>=1?'Ratio aceptable. Necesitas alta tasa de acierto.':'Ratio desfavorable. Ajusta TP o SL.';}
+function cV(){const a=+document.getElementById('v1').value||0,f=document.getElementById('v2').value,t=document.getElementById('v3').value;const inU=f==='usd'?a:f==='eur'?a*1.085:a*pr[f];const res=t==='usd'?inU:t==='eur'?inU/1.085:inU/pr[t];const pfx=t==='usd'?'$':t==='eur'?'€':'';const sfx=t!=='usd'&&t!=='eur'?' '+t.toUpperCase():'';document.getElementById('vr').textContent=pfx+res.toLocaleString('es-ES',{maximumFractionDigits:6})+sfx;}
+cP();cL();cPL();cV();
+</script></body></html>

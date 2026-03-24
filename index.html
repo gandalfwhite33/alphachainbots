@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AlphaChainBots — AI-Powered Crypto Trading</title>
+<meta name="description" content="AlphaChainBots analiza 500+ indicadores en tiempo real y ejecuta operaciones automáticamente. Sin emociones. Sin interrupciones.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ─── RESET & BASE ─────────────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg-deep:#030b18;
+  --bg-base:#060f1f;
+  --bg-surface:rgba(8,18,36,0.8);
+  --bg-elevated:rgba(12,26,52,0.85);
+  --blue:#1652f0;
+  --blue-mid:#2563eb;
+  --blue-bright:#3b82f6;
+  --blue-light:#60a5fa;
+  --blue-glow:rgba(22,82,240,0.22);
+  --green:#00d395;
+  --green-bg:rgba(0,211,149,0.1);
+  --green-text:#00d395;
+  --red:#f44f4f;
+  --red-bg:rgba(244,79,79,0.1);
+  --text:#f0f6ff;
+  --text-sec:rgba(220,232,255,0.52);
+  --text-muted:rgba(180,205,255,0.28);
+  --border:rgba(59,130,246,0.12);
+  --border-bright:rgba(59,130,246,0.26);
+  --radius-xl:20px;
+  --radius-lg:16px;
+  --radius-md:12px;
+  --radius-sm:8px;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg-deep);color:var(--text);font-family:'Inter',system-ui,sans-serif;font-size:16px;line-height:1.6;overflow-x:hidden}
+a{text-decoration:none;color:inherit}
+
+/* ─── AMBIENT BLOBS ────────────────────────────────────────────── */
+.blobs{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.blob{position:absolute;border-radius:50%;filter:blur(80px);animation:blobFloat 18s ease-in-out infinite alternate}
+.blob-1{width:600px;height:600px;background:radial-gradient(circle,rgba(22,82,240,0.12) 0%,transparent 70%);top:-200px;left:-100px;animation-duration:20s}
+.blob-2{width:500px;height:500px;background:radial-gradient(circle,rgba(0,211,149,0.06) 0%,transparent 70%);bottom:-150px;right:-100px;animation-duration:16s;animation-delay:-8s}
+.blob-3{width:400px;height:400px;background:radial-gradient(circle,rgba(99,102,241,0.08) 0%,transparent 70%);top:50%;left:60%;animation-duration:22s;animation-delay:-4s}
+@keyframes blobFloat{0%{transform:translate(0,0) scale(1)}100%{transform:translate(40px,30px) scale(1.08)}}
+
+/* ─── NAV ──────────────────────────────────────────────────────── */
+.nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:68px;position:fixed;top:0;left:0;right:0;z-index:200;transition:all 0.3s}
+.nav.scrolled{background:rgba(3,11,24,0.92);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1px solid var(--border)}
+.logo{display:flex;align-items:center;gap:11px}
+.logo-name{display:flex;flex-direction:column;line-height:1.1}
+.logo-name span:first-child{font-size:15px;font-weight:800;letter-spacing:-0.4px}
+.logo-name span:last-child{font-size:10px;font-weight:600;letter-spacing:2px;color:var(--text-muted);text-transform:uppercase}
+.nav-links{display:flex;gap:4px}
+.nav-links a{font-size:13.5px;color:var(--text-sec);padding:6px 12px;border-radius:var(--radius-sm);transition:all 0.18s;font-weight:500}
+.nav-links a:hover{color:var(--text);background:rgba(59,130,246,0.08)}
+.nav-right{display:flex;gap:8px;align-items:center}
+.btn-ghost{font-size:13.5px;color:var(--text-sec);padding:8px 18px;border-radius:var(--radius-sm);border:1px solid var(--border);transition:all 0.2s;font-weight:500;cursor:pointer}
+.btn-ghost:hover{color:var(--text);border-color:var(--border-bright);background:rgba(59,130,246,0.06)}
+.btn-primary{background:linear-gradient(135deg,var(--blue) 0%,var(--blue-bright) 100%);color:#fff;font-size:13.5px;padding:9px 20px;border-radius:var(--radius-sm);font-weight:600;transition:all 0.22s;box-shadow:0 0 20px rgba(22,82,240,0.25);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 24px rgba(22,82,240,0.45)}
+
+/* ─── HERO ─────────────────────────────────────────────────────── */
+.hero-wrap{position:relative;z-index:1}
+.hero-content{max-width:1200px;margin:0 auto;padding:110px 48px 88px;display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:flex-start;width:100%}
+
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(22,82,240,0.12);border:1px solid rgba(59,130,246,0.25);color:#93c5fd;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;padding:7px 16px;border-radius:100px;margin-bottom:32px}
+.bdot{width:6px;height:6px;background:var(--blue-bright);border-radius:50%;animation:pulse2 2s infinite;flex-shrink:0}
+@keyframes pulse2{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(59,130,246,0.5)}50%{opacity:0.5;box-shadow:0 0 0 4px rgba(59,130,246,0)}}
+
+.hero-h1{font-size:60px;font-weight:900;line-height:1.03;letter-spacing:-2.8px;margin-bottom:24px}
+.hero-h1 em{font-style:normal;color:transparent;background:linear-gradient(120deg,#60a5fa 0%,#3b82f6 40%,#a5b4fc 100%);-webkit-background-clip:text;background-clip:text}
+.hero-sub{font-size:17px;color:var(--text-sec);line-height:1.8;max-width:480px;margin-bottom:40px;font-weight:400}
+.hero-ctas{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:48px}
+.btn-hero-p{background:linear-gradient(135deg,#1652f0 0%,#3b82f6 100%);color:#fff;padding:15px 32px;border-radius:var(--radius-md);font-size:15px;font-weight:700;display:inline-flex;align-items:center;gap:8px;transition:all 0.25s;box-shadow:0 0 32px rgba(22,82,240,0.35),0 2px 0 rgba(255,255,255,0.08) inset;cursor:pointer}
+.btn-hero-p:hover{transform:translateY(-2px);box-shadow:0 8px 40px rgba(22,82,240,0.5),0 2px 0 rgba(255,255,255,0.1) inset}
+.btn-hero-s{border:1px solid rgba(255,255,255,0.13);color:rgba(255,255,255,0.72);padding:15px 32px;border-radius:var(--radius-md);font-size:15px;font-weight:600;transition:all 0.2s;cursor:pointer}
+.btn-hero-s:hover{border-color:rgba(255,255,255,0.28);color:#fff;background:rgba(255,255,255,0.04)}
+.hero-trust{display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.trust-item{display:flex;align-items:center;gap:8px}
+.trust-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.trust-dot.green{background:var(--green);box-shadow:0 0 8px var(--green)}
+.trust-sep{width:1px;height:16px;background:rgba(255,255,255,0.1)}
+.trust-text{font-size:12px;color:var(--text-muted)}
+.trust-text strong{color:rgba(255,255,255,0.78);font-weight:600}
+
+/* ─── HERO RIGHT — NO BOX, FLOATING ───────────────────────────── */
+.dash-card{position:relative;padding:0;background:none;border:none}
+.dash-inner{background:none;backdrop-filter:none;-webkit-backdrop-filter:none;border-radius:0;padding:0}
+.dc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.dc-label{font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:0.9px;text-transform:uppercase}
+.live-chip{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--green);letter-spacing:0.8px;text-transform:uppercase}
+.ldot{width:5px;height:5px;background:var(--green);border-radius:50%;animation:pulse2 1.5s infinite}
+.dc-price{font-size:52px;font-weight:900;letter-spacing:-3px;line-height:1;margin-bottom:12px;font-variant-numeric:tabular-nums;transition:color 0.3s}
+.dc-meta{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.dc-badge{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;padding:4px 12px;border-radius:100px;font-variant-numeric:tabular-nums}
+.dc-badge.up-b{background:var(--green-bg);color:var(--green)}
+.dc-badge.dn-b{background:var(--red-bg);color:var(--red)}
+.dc-vol{font-size:11px;color:var(--text-muted)}
+.mini-c{height:180px;margin:0 0 16px;position:relative;overflow:hidden;background:transparent}
+.signals-mini{display:flex;flex-direction:column;gap:8px}
+/* ── coin rows as individual glass cards ── */
+.sm-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;background:none;border:none;cursor:default}
+.sm-item:hover .sm-name{color:var(--blue-light)}
+.sm-l{display:flex;align-items:center;gap:10px}
+.sm-coin{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;letter-spacing:0.3px}
+.sm-name{font-size:13px;font-weight:600;color:var(--text)}
+.sm-dir{font-size:10px;color:var(--text-muted);margin-top:1px;font-weight:500}
+.sm-pnl{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums}
+/* keep these for other sections */
+.dc-divider{height:1px;background:var(--border);margin:4px 0}
+.dc-stats{display:grid;grid-template-columns:repeat(3,1fr);margin-top:4px}
+.s3{padding:14px 0;text-align:center;position:relative}
+.s3:not(:last-child)::after{content:'';position:absolute;right:0;top:20%;height:60%;width:1px;background:var(--border)}
+.s3-v{font-size:20px;font-weight:900;letter-spacing:-0.5px;font-variant-numeric:tabular-nums}
+.s3-l{font-size:10px;color:var(--text-muted);margin-top:3px;letter-spacing:0.3px;font-weight:500;text-transform:uppercase}
+.ex-chips{display:flex;align-items:center;gap:5px;padding:14px 0 0;flex-wrap:wrap}
+.ex-l{font-size:10px;color:var(--text-muted);margin-right:3px;font-weight:500}
+.ec{background:rgba(59,130,246,0.08);border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-size:10px;font-weight:600;color:rgba(180,210,255,0.55);transition:all 0.2s}
+.ec:hover{background:rgba(59,130,246,0.14);color:#93c5fd}
+
+/* ─── TICKER ───────────────────────────────────────────────────── */
+.ticker{background:rgba(22,82,240,0.05);border-top:1px solid rgba(22,82,240,0.15);border-bottom:1px solid rgba(22,82,240,0.15);padding:10px 0;overflow:hidden;position:relative;z-index:5}
+.ticker-inner{display:flex;animation:tick 28s linear infinite;width:max-content}
+.ti{display:flex;align-items:center;gap:8px;padding:0 32px;border-right:1px solid rgba(255,255,255,0.05);font-size:12.5px;white-space:nowrap}
+.tc{font-weight:700;color:rgba(220,232,255,0.8);font-variant-numeric:tabular-nums}
+.tp{color:var(--text-muted);font-variant-numeric:tabular-nums}
+.tch{font-weight:700;font-size:12px;font-variant-numeric:tabular-nums}
+.up{color:var(--green)}.dn{color:var(--red)}
+@keyframes tick{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+/* ─── NUMBERS STRIP ─────────────────────────────────────────────── */
+.nums{background:rgba(22,82,240,0.04);border-top:1px solid rgba(22,82,240,0.12);border-bottom:1px solid rgba(22,82,240,0.12);position:relative;z-index:1}
+.nums-in{max-width:1200px;margin:0 auto;padding:60px 48px;display:grid;grid-template-columns:repeat(4,1fr)}
+.ni{text-align:center;padding:0 24px;border-right:1px solid rgba(255,255,255,0.05)}
+.ni:last-child{border-right:none}
+.nv{font-size:44px;font-weight:900;letter-spacing:-2px;background:linear-gradient(135deg,#fff 0%,#93c5fd 100%);-webkit-background-clip:text;background-clip:text;color:transparent;font-variant-numeric:tabular-nums;line-height:1.1}
+.nl{font-size:13px;color:var(--text-muted);margin-top:8px;font-weight:500}
+
+/* ─── SECTION COMMON ────────────────────────────────────────────── */
+.sec{padding:100px 48px;max-width:1200px;margin:0 auto;position:relative;z-index:1}
+.dsec-wrap{background:rgba(22,82,240,0.03);border-top:1px solid var(--border);border-bottom:1px solid var(--border);position:relative;z-index:1}
+.dsec{max-width:1200px;margin:0 auto;padding:100px 48px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--blue-bright);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.eyebrow::before{content:'';display:block;width:20px;height:2px;background:linear-gradient(90deg,var(--blue-bright),transparent);border-radius:2px}
+.sec-h2{font-size:44px;font-weight:900;letter-spacing:-1.8px;line-height:1.08;margin-bottom:16px}
+.sec-sub{font-size:17px;color:var(--text-sec);max-width:540px;line-height:1.75;font-weight:400}
+
+/* ─── PAIN CARDS ────────────────────────────────────────────────── */
+.pg{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border-radius:var(--radius-xl);overflow:hidden;margin-top:52px}
+.pc{background:var(--bg-base);padding:44px;transition:all 0.22s;position:relative;overflow:hidden}
+.pc::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(22,82,240,0.07),transparent 50%);opacity:0;transition:opacity 0.3s}
+.pc:hover{background:rgba(8,20,40,0.95)}.pc:hover::after{opacity:1}
+.pc-icon{width:48px;height:48px;border-radius:var(--radius-md);background:rgba(22,82,240,0.12);border:1px solid rgba(59,130,246,0.2);display:flex;align-items:center;justify-content:center;margin-bottom:20px;position:relative}
+.pc h3{font-size:18px;font-weight:700;margin-bottom:11px;letter-spacing:-0.3px;position:relative}
+.pc p{font-size:14px;color:var(--text-sec);line-height:1.78;position:relative}
+
+/* ─── STEPS ─────────────────────────────────────────────────────── */
+.stps{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--border);border-radius:var(--radius-xl);overflow:hidden;margin-top:52px;background:rgba(6,15,31,0.6)}
+.stp{padding:40px 28px;border-right:1px solid var(--border);position:relative;transition:background 0.2s}
+.stp:last-child{border-right:none}
+.stp:hover{background:rgba(22,82,240,0.05)}
+.stp-num{position:absolute;top:20px;right:22px;font-size:56px;font-weight:900;color:rgba(59,130,246,0.05);line-height:1;letter-spacing:-4px;font-variant-numeric:tabular-nums}
+.stp-ic{width:46px;height:46px;border-radius:var(--radius-md);background:linear-gradient(135deg,var(--blue) 0%,var(--blue-bright) 100%);display:flex;align-items:center;justify-content:center;margin-bottom:20px;box-shadow:0 0 20px rgba(22,82,240,0.3)}
+.stp h3{font-size:16px;font-weight:700;margin-bottom:10px;letter-spacing:-0.2px}
+.stp p{font-size:13px;color:var(--text-sec);line-height:1.72}
+
+/* ─── FEATURE CARDS ─────────────────────────────────────────────── */
+.fg{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:52px}
+.fc{border:1px solid var(--border);border-radius:var(--radius-xl);padding:36px;background:rgba(8,18,36,0.6);transition:all 0.22s;position:relative;overflow:hidden;cursor:default}
+.fc::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(59,130,246,0.3),transparent);opacity:0;transition:opacity 0.3s}
+.fc::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(22,82,240,0.07),transparent 60%);opacity:0;transition:opacity 0.3s}
+.fc:hover{border-color:var(--border-bright);transform:translateY(-3px);box-shadow:0 8px 32px rgba(22,82,240,0.12)}.fc:hover::before,.fc:hover::after{opacity:1}
+.fc.hot{border-color:rgba(59,130,246,0.3);background:rgba(22,82,240,0.08)}
+.fc.hot::before{opacity:1;background:linear-gradient(90deg,transparent,rgba(59,130,246,0.5),transparent)}
+.fc-badge{display:inline-block;background:linear-gradient(135deg,var(--blue),var(--blue-bright));color:#fff;font-size:10px;font-weight:700;padding:4px 12px;border-radius:100px;margin-bottom:20px;letter-spacing:0.5px;text-transform:uppercase;position:relative}
+.fc-ic{width:46px;height:46px;border-radius:var(--radius-md);background:rgba(22,82,240,0.12);border:1px solid rgba(59,130,246,0.18);display:flex;align-items:center;justify-content:center;margin-bottom:20px;position:relative}
+.fc h3{font-size:17px;font-weight:700;margin-bottom:10px;letter-spacing:-0.3px;position:relative}
+.fc p{font-size:14px;color:var(--text-sec);margin-bottom:20px;line-height:1.72;position:relative}
+.ftags{display:flex;flex-wrap:wrap;gap:7px;position:relative}
+.ftag{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:6px;font-size:11px;font-weight:500;color:rgba(200,220,255,0.5);padding:3px 10px;transition:all 0.2s}
+.fc.hot .ftag{background:rgba(22,82,240,0.2);border-color:rgba(59,130,246,0.25);color:#93c5fd}
+
+/* ─── SIGNALS TABLE ─────────────────────────────────────────────── */
+.st{border:1px solid var(--border);border-radius:var(--radius-xl);overflow:hidden;margin-top:52px;background:rgba(6,15,31,0.5)}
+.sh{display:grid;grid-template-columns:110px 100px 100px 1fr 100px 120px;padding:13px 24px;background:rgba(22,82,240,0.05);font-size:10.5px;font-weight:700;letter-spacing:0.9px;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border)}
+.sr{display:grid;grid-template-columns:110px 100px 100px 1fr 100px 120px;padding:16px 24px;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.03);align-items:center;transition:background 0.15s;cursor:default}
+.sr:last-child{border-bottom:none}.sr:hover{background:rgba(59,130,246,0.05)}
+.sp{font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-0.2px}
+.dim{color:var(--text-sec);font-size:13px;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;padding:3px 11px;border-radius:100px;font-size:10.5px;font-weight:700;letter-spacing:0.4px}
+.pl{background:rgba(0,211,149,0.1);color:var(--green)}
+.ps{background:rgba(244,79,79,0.1);color:var(--red)}
+.pw{background:rgba(0,211,149,0.1);color:var(--green)}
+.px{background:rgba(244,79,79,0.1);color:var(--red)}
+.po{background:rgba(59,130,246,0.1);color:var(--blue-light)}
+
+/* ─── INDICATORS ────────────────────────────────────────────────── */
+.ig{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:52px}
+.ic{border:1px solid var(--border);border-radius:var(--radius-lg);padding:26px;background:rgba(8,18,36,0.6);transition:all 0.2s}
+.ic:hover{border-color:var(--border-bright);background:rgba(10,22,44,0.8)}
+.ic h4{font-size:10.5px;font-weight:700;letter-spacing:0.9px;color:var(--blue-light);text-transform:uppercase;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.il{list-style:none}
+.il li{font-size:13px;color:var(--text-sec);padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.03);display:flex;align-items:center;gap:9px;font-weight:400}
+.il li:last-child{border-bottom:none}
+.id{width:4px;height:4px;background:var(--blue-bright);border-radius:50%;flex-shrink:0}
+
+/* ─── CTA SECTION ────────────────────────────────────────────────── */
+.ctas{padding:0 48px 96px;max-width:1200px;margin:0 auto;position:relative;z-index:1}
+.ctab{background:linear-gradient(135deg,rgba(22,82,240,0.22) 0%,rgba(37,99,235,0.12) 40%,rgba(22,82,240,0.18) 100%);border:1px solid rgba(59,130,246,0.25);border-radius:28px;padding:88px;text-align:center;position:relative;overflow:hidden}
+.ctab::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 70% at 50% -10%,rgba(59,130,246,0.18) 0%,transparent 65%);pointer-events:none}
+.ctab::after{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:60%;height:1px;background:linear-gradient(90deg,transparent,rgba(99,155,255,0.4),transparent)}
+.ctab h2{font-size:48px;font-weight:900;letter-spacing:-2.2px;line-height:1.05;margin-bottom:18px;position:relative}
+.ctab p{font-size:17px;color:var(--text-sec);max-width:500px;margin:0 auto 40px;position:relative;line-height:1.75}
+.cta-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;position:relative}
+.btn-cw{background:#fff;color:#0a1628;padding:15px 36px;border-radius:var(--radius-md);font-size:16px;font-weight:800;transition:all 0.2s;cursor:pointer}
+.btn-cw:hover{background:#e8efff;transform:translateY(-1px);box-shadow:0 4px 20px rgba(255,255,255,0.15)}
+.btn-co{border:1px solid rgba(255,255,255,0.18);color:rgba(255,255,255,0.72);padding:15px 36px;border-radius:var(--radius-md);font-size:16px;font-weight:600;transition:all 0.2s;cursor:pointer}
+.btn-co:hover{border-color:rgba(255,255,255,0.35);color:#fff;background:rgba(255,255,255,0.05)}
+.cta-note{margin-top:24px;font-size:13px;color:var(--text-muted);position:relative}
+
+/* ─── FOOTER ────────────────────────────────────────────────────── */
+.footer-wrap{border-top:1px solid var(--border);position:relative;z-index:1}
+footer{background:transparent;padding:64px 48px 32px;max-width:1200px;margin:0 auto}
+.ft{display:grid;grid-template-columns:1.8fr 1fr 1fr 1fr;gap:48px;margin-bottom:48px}
+.fb{font-size:15px;font-weight:800;display:flex;align-items:center;gap:9px;margin-bottom:14px;letter-spacing:-0.2px}
+.fd{font-size:13px;color:var(--text-muted);line-height:1.75;max-width:230px;font-weight:400}
+footer h5{font-size:10.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:16px}
+.fl{list-style:none}
+.fl li{margin-bottom:10px}
+.fl a{font-size:13px;color:rgba(200,220,255,0.4);transition:color 0.2s;font-weight:400}
+.fl a:hover{color:var(--text)}
+.fbot{border-top:1px solid rgba(255,255,255,0.05);padding-top:24px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.fcp{font-size:12px;color:rgba(180,205,255,0.22)}
+.risk-bar{background:rgba(255,255,255,0.02);border-top:1px solid rgba(255,255,255,0.04);padding:16px 48px}
+.risk-bar p{font-size:11px;color:rgba(180,205,255,0.18);line-height:1.65;max-width:1200px;margin:0 auto}
+
+/* ─── ANIMATIONS ────────────────────────────────────────────────── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+.fu{opacity:0;animation:fadeUp 0.65s cubic-bezier(0.16,1,0.3,1) forwards}
+.d1{animation-delay:0.05s}.d2{animation-delay:0.15s}.d3{animation-delay:0.28s}.d4{animation-delay:0.42s}
+
+/* ─── RESPONSIVE ────────────────────────────────────────────────── */
+@media(max-width:960px){
+  .nav{padding:0 20px}.nav-links{display:none}
+  .hero-content{grid-template-columns:1fr;padding:100px 20px 56px;gap:48px}
+  .hero-h1{font-size:40px;letter-spacing:-2px}
+  .nums-in{grid-template-columns:1fr 1fr;padding:40px 20px;gap:0}
+  .ni{border-right:none;border-bottom:1px solid rgba(255,255,255,0.05);padding:22px 0}
+  .pg{grid-template-columns:1fr}
+  .stps{grid-template-columns:1fr 1fr}
+  .stp{border-right:none;border-bottom:1px solid var(--border)}
+  .fg{grid-template-columns:1fr}
+  .ig{grid-template-columns:1fr 1fr}
+  .sec,.dsec{padding:64px 20px}
+  .sh,.sr{grid-template-columns:90px 85px 85px 1fr}
+  .sh>*:nth-child(5),.sh>*:nth-child(6),.sr>*:nth-child(5),.sr>*:nth-child(6){display:none}
+  .ctab{padding:48px 24px}.ctab h2{font-size:32px;letter-spacing:-1.5px}
+  .ctas{padding:0 20px 64px}
+  footer{padding:48px 20px 28px}.ft{grid-template-columns:1fr 1fr}
+  .risk-bar{padding:14px 20px}
+  .blobs{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- Ambient blobs -->
+<div class="blobs" aria-hidden="true">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
+
+<!-- ─── NAV ─────────────────────────────────────────────────────── -->
+<nav class="nav" id="nav">
+  <a href="index.html" class="logo">
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="36" height="36" rx="9" fill="url(#logoGrad)"/>
+      <defs><linearGradient id="logoGrad" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse"><stop stop-color="#1652f0"/><stop offset="1" stop-color="#3b82f6"/></linearGradient></defs>
+      <rect x="7" y="24" width="4" height="7" rx="1.5" fill="white" opacity="0.35"/>
+      <rect x="7" y="20" width="4" height="3.5" rx="1" fill="white"/>
+      <rect x="13" y="17" width="4" height="14" rx="1.5" fill="white" opacity="0.35"/>
+      <rect x="13" y="12" width="4" height="4.5" rx="1" fill="white"/>
+      <rect x="19" y="22" width="4" height="9" rx="1.5" fill="#00d395" opacity="0.35"/>
+      <rect x="19" y="16" width="4" height="5.5" rx="1" fill="#00d395"/>
+      <rect x="25" y="19" width="4" height="12" rx="1.5" fill="#00d395" opacity="0.35"/>
+      <rect x="25" y="13" width="4" height="5.5" rx="1" fill="#00d395"/>
+      <path d="M9 23L15 16L21 20L27 14" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+    </svg>
+    <div class="logo-name">
+      <span>AlphaChain</span>
+      <span>Bots</span>
+    </div>
+  </a>
+  <div class="nav-links">
+    <a href="index.html">Inicio</a>
+    <a href="stats.html">Track record</a>
+    <a href="charts.html">Charts</a>
+    <a href="tools.html">Herramientas</a>
+    <a href="precios.html">Precios</a>
+    <a href="faq.html">FAQ</a>
+  </div>
+  <div class="nav-right">
+    <a href="#" class="btn-ghost">Iniciar sesión</a>
+    <a href="#" class="btn-primary">
+      Empezar gratis
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7h9M7.5 3.5L11 7l-3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+  </div>
+</nav>
+
+<!-- ─── HERO ─────────────────────────────────────────────────────── -->
+<div class="hero-wrap">
+  <div class="hero-content">
+    <!-- Left: copy -->
+    <div>
+      <div class="hero-badge fu d1"><div class="bdot"></div>IA aplicada al trading cripto</div>
+      <h1 class="hero-h1 fu d2">Opera como<br>las instituciones.<br><em>Sin ser una.</em></h1>
+      <p class="hero-sub fu d3">AlphaChainBots analiza 500+ indicadores cada 5 minutos y ejecuta operaciones automáticamente. La misma ventaja que los fondos cuantitativos — ahora al alcance de cualquier trader.</p>
+      <div class="hero-ctas fu d4">
+        <a href="#" class="btn-hero-p">Empieza gratis ahora <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+        <a href="stats.html" class="btn-hero-s">Ver track record →</a>
+      </div>
+      <div class="hero-trust fu d4">
+        <div class="trust-item">
+          <div class="trust-dot green"></div>
+          <span class="trust-text">Backtested · <strong>+18 meses</strong> de datos reales</span>
+        </div>
+        <div class="trust-sep"></div>
+        <div class="trust-item">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1l1.5 4H13L9.5 8l1.5 4L7 10l-4 2 1.5-4L1 5h4.5L7 1z" fill="#f59e0b"/></svg>
+          <span class="trust-text">Sharpe <strong>2.4</strong> · drawdown máx <strong>8.3%</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: floating price + chart + glass coin cards -->
+    <div class="fu d3">
+      <!-- label + live -->
+      <div class="dc-header">
+        <span class="dc-label">BTC/USDT · Perpetual</span>
+        <span class="live-chip"><span class="ldot"></span>En Vivo</span>
+      </div>
+      <!-- price floating -->
+      <div class="dc-price" id="hero-price">$83,420.50</div>
+      <div class="dc-meta">
+        <span class="dc-badge up-b" id="hero-chg">↑ +2.34% hoy</span>
+        <span class="dc-vol" id="hero-vol">Vol: —</span>
+      </div>
+      <!-- chart directly on background -->
+      <div class="mini-c"><canvas id="mini-c" style="display:block;width:100%;height:100%"></canvas></div>
+      <!-- glass coin cards -->
+      <div class="signals-mini">
+        <div class="sm-item">
+          <div class="sm-l">
+            <div class="sm-coin" style="background:rgba(247,147,26,0.12);color:#f7931a">BTC</div>
+            <div><div class="sm-name">Bitcoin</div><div class="sm-dir">LONG · Hace 2h</div></div>
+          </div>
+          <div class="sm-pnl" style="color:var(--green)">+3.40%</div>
+        </div>
+        <div class="sm-item">
+          <div class="sm-l">
+            <div class="sm-coin" style="background:rgba(98,126,234,0.12);color:#627eea">ETH</div>
+            <div><div class="sm-name">Ethereum</div><div class="sm-dir">SHORT · Hace 4h</div></div>
+          </div>
+          <div class="sm-pnl" style="color:var(--green)">+1.80%</div>
+        </div>
+        <div class="sm-item">
+          <div class="sm-l">
+            <div class="sm-coin" style="background:rgba(153,69,255,0.12);color:#9945ff">SOL</div>
+            <div><div class="sm-name">Solana</div><div class="sm-dir">LONG · Abierta</div></div>
+          </div>
+          <div class="sm-pnl" style="color:var(--blue-light)">+0.90%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── TICKER ────────────────────────────────────────────────────── -->
+<div class="ticker">
+  <div class="ticker-inner">
+    <div class="ti"><span class="tc">BTC/USDT</span><span class="tp">$83,420</span><span class="tch up">+2.34%</span></div>
+    <div class="ti"><span class="tc">ETH/USDT</span><span class="tp">$1,960</span><span class="tch up">+1.12%</span></div>
+    <div class="ti"><span class="tc">SOL/USDT</span><span class="tp">$124.80</span><span class="tch up">+3.87%</span></div>
+    <div class="ti"><span class="tc">BNB/USDT</span><span class="tp">$598</span><span class="tch dn">-0.43%</span></div>
+    <div class="ti"><span class="tc">XRP/USDT</span><span class="tp">$2.14</span><span class="tch up">+0.88%</span></div>
+    <div class="ti"><span class="tc">DOGE/USDT</span><span class="tp">$0.182</span><span class="tch dn">-1.20%</span></div>
+    <div class="ti"><span class="tc">AVAX/USDT</span><span class="tp">$23.40</span><span class="tch up">+2.10%</span></div>
+    <div class="ti"><span class="tc">LINK/USDT</span><span class="tp">$13.80</span><span class="tch up">+1.55%</span></div>
+    <div class="ti"><span class="tc">MATIC/USDT</span><span class="tp">$0.48</span><span class="tch dn">-0.75%</span></div>
+    <div class="ti"><span class="tc">BTC/USDT</span><span class="tp">$83,420</span><span class="tch up">+2.34%</span></div>
+    <div class="ti"><span class="tc">ETH/USDT</span><span class="tp">$1,960</span><span class="tch up">+1.12%</span></div>
+    <div class="ti"><span class="tc">SOL/USDT</span><span class="tp">$124.80</span><span class="tch up">+3.87%</span></div>
+    <div class="ti"><span class="tc">BNB/USDT</span><span class="tp">$598</span><span class="tch dn">-0.43%</span></div>
+    <div class="ti"><span class="tc">XRP/USDT</span><span class="tp">$2.14</span><span class="tch up">+0.88%</span></div>
+    <div class="ti"><span class="tc">DOGE/USDT</span><span class="tp">$0.182</span><span class="tch dn">-1.20%</span></div>
+    <div class="ti"><span class="tc">AVAX/USDT</span><span class="tp">$23.40</span><span class="tch up">+2.10%</span></div>
+    <div class="ti"><span class="tc">LINK/USDT</span><span class="tp">$13.80</span><span class="tch up">+1.55%</span></div>
+    <div class="ti"><span class="tc">MATIC/USDT</span><span class="tp">$0.48</span><span class="tch dn">-0.75%</span></div>
+  </div>
+</div>
+
+<!-- ─── NUMBERS ────────────────────────────────────────────────────── -->
+<div class="nums">
+  <div class="nums-in">
+    <div class="ni"><div class="nv">+68.4%</div><div class="nl">Rendimiento verificado 2025</div></div>
+    <div class="ni"><div class="nv">71%</div><div class="nl">Tasa de acierto histórica</div></div>
+    <div class="ni"><div class="nv">500+</div><div class="nl">Indicadores analizados c/5min</div></div>
+    <div class="ni"><div class="nv">2,400+</div><div class="nl">Traders activos en la plataforma</div></div>
+  </div>
+</div>
+
+<!-- ─── PAIN ──────────────────────────────────────────────────────── -->
+<div class="dsec-wrap">
+  <div class="dsec">
+    <div class="eyebrow">El problema</div>
+    <h2 class="sec-h2">Diseñado para traders<br>que están hartos de…</h2>
+    <p class="sec-sub">El 90% de los traders pierden porque operan con emociones, sin sistema y mirando pantallas a las 3am. AlphaChainBots elimina todas esas variables.</p>
+    <div class="pg">
+      <div class="pc">
+        <div class="pc-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="1" y="2" width="18" height="13" rx="3" stroke="#60a5fa" stroke-width="1.5"/><path d="M7 18h6M10 15v3" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
+        <h3>Pegado a las gráficas todo el día</h3>
+        <p>Horas mirando velas esperando un setup que quizás nunca llega. Tu tiempo vale infinitamente más. AlphaChainBots monitoriza 24/7 por ti.</p>
+      </div>
+      <div class="pc">
+        <div class="pc-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="#60a5fa" stroke-width="1.5"/><path d="M10 6v4l2.5 2.5" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </div>
+        <h3>Perderte movimientos mientras duermes</h3>
+        <p>El mejor setup del mes ocurrió a las 3am. Nuestro sistema no duerme, no descansa y nunca pierde una señal de alta probabilidad.</p>
+      </div>
+      <div class="pc">
+        <div class="pc-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 16L8.5 9L12 13L14.5 10L18 14" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h3>Decisiones guiadas por emociones</h3>
+        <p>FOMO en entradas, pánico en caídas, revenge trading. El algoritmo no tiene ego. Solo datos, lógica y probabilidades.</p>
+      </div>
+      <div class="pc">
+        <div class="pc-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2v5M10 13v5M2 10h5M13 10h5" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="10" r="3" stroke="#60a5fa" stroke-width="1.5"/></svg>
+        </div>
+        <h3>Grupos de señales sin transparencia</h3>
+        <p>Solo te muestran sus éxitos. En AlphaChainBots publicamos cada señal — gane o pierda. El historial completo, siempre visible, siempre auditado.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── HOW IT WORKS ──────────────────────────────────────────────── -->
+<div class="sec">
+  <div class="eyebrow">El proceso</div>
+  <h2 class="sec-h2">Listo en 10 minutos.<br>Operando en automático.</h2>
+  <p class="sec-sub">Configuras una vez. El sistema trabaja para siempre.</p>
+  <div class="stps">
+    <div class="stp">
+      <div class="stp-num">01</div>
+      <div class="stp-ic"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="white" stroke-width="1.5"/><path d="M7 10l2 2 4-4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <h3>Monitorizamos</h3>
+      <p>500+ indicadores sobre BTC, ETH y SOL analizados cada 5 minutos, los 365 días del año. Sin parar.</p>
+    </div>
+    <div class="stp">
+      <div class="stp-num">02</div>
+      <div class="stp-ic"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 4h12M4 8h8M4 12h10M4 16h6" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+      <h3>Detectamos</h3>
+      <p>Cuando las condiciones coinciden con nuestros criterios de alta probabilidad, el sistema dispara la alerta en milisegundos.</p>
+    </div>
+    <div class="stp">
+      <div class="stp-num">03</div>
+      <div class="stp-ic"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3v14M3 10h14" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+      <h3>Ejecutamos</h3>
+      <p>Recibes la señal al instante por Telegram, Discord o email. O activa el auto-trading y el sistema ejecuta solo.</p>
+    </div>
+    <div class="stp">
+      <div class="stp-num">04</div>
+      <div class="stp-ic"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="3" stroke="white" stroke-width="1.5"/><path d="M7 10l2 2 4-4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <h3>Registramos</h3>
+      <p>Cada señal auditada con entrada, salida y resultado. Historial 100% público. Sin pérdidas ocultas. Nunca.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ─── FEATURES ──────────────────────────────────────────────────── -->
+<div class="dsec-wrap">
+  <div class="dsec">
+    <div class="eyebrow">Funcionalidades</div>
+    <h2 class="sec-h2">Todo lo que necesitas<br>para operar en serio.</h2>
+    <p class="sec-sub">Sin funciones de relleno. Solo herramientas que generan resultados reales.</p>
+    <div class="fg">
+      <div class="fc">
+        <div class="fc-ic"><svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M3 16l5-6 4 4 3-5 5 7" stroke="#60a5fa" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3>Señales de trading</h3>
+        <p>Alertas precisas con entrada, stop-loss y take-profit. Sin interpretaciones. Sin ambigüedades. Actúa en segundos.</p>
+        <div class="ftags"><span class="ftag">Telegram</span><span class="ftag">Discord</span><span class="ftag">Email</span><span class="ftag">BTC · ETH · SOL</span></div>
+      </div>
+      <div class="fc hot">
+        <div class="fc-badge">Más popular</div>
+        <div class="fc-ic"><svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 3l2 6.2H19l-5.2 3.8 2 6.2L11 15.3l-4.8 4 2-6.2L3 9.2h6.2L11 3z" stroke="#60a5fa" stroke-width="1.8" stroke-linejoin="round"/></svg></div>
+        <h3>Auto-trading</h3>
+        <p>Conecta tu exchange por API. AlphaChainBots ejecuta automáticamente con tus parámetros de riesgo. Tú defines el límite.</p>
+        <div class="ftags"><span class="ftag">Binance</span><span class="ftag">Bybit</span><span class="ftag">Bitget</span><span class="ftag">HyperLiquid</span></div>
+      </div>
+      <div class="fc">
+        <div class="fc-ic"><svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 2a9 9 0 100 18A9 9 0 0011 2z" stroke="#60a5fa" stroke-width="1.8"/><path d="M8 11l2 2 4-4" stroke="#60a5fa" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3>Transparencia total</h3>
+        <p>Historial público de todas las señales desde el primer día. Ni una pérdida oculta. La confianza no se declara, se demuestra.</p>
+        <div class="ftags"><span class="ftag">Resultados en vivo</span><span class="ftag">Historial auditado</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── SIGNALS ────────────────────────────────────────────────────── -->
+<div class="sec">
+  <div class="eyebrow">Track record</div>
+  <h2 class="sec-h2">Señales reales.<br>Resultados verificados.</h2>
+  <p class="sec-sub">Todo el historial — ganas y pérdidas. La confianza se construye con transparencia radical.</p>
+  <div class="st">
+    <div class="sh"><span>Par</span><span>Dirección</span><span>Estado</span><span>Entrada</span><span>Variación</span><span>Hace</span></div>
+    <div class="sr"><span class="sp">BTC/USDT</span><span><span class="pill pl">LONG</span></span><span><span class="pill pw">GANADA</span></span><span class="dim">$83,420</span><span class="up" style="font-weight:700;font-variant-numeric:tabular-nums">+3.40%</span><span class="dim">2h atrás</span></div>
+    <div class="sr"><span class="sp">ETH/USDT</span><span><span class="pill ps">SHORT</span></span><span><span class="pill pw">GANADA</span></span><span class="dim">$1,960</span><span class="up" style="font-weight:700;font-variant-numeric:tabular-nums">+1.80%</span><span class="dim">4h atrás</span></div>
+    <div class="sr"><span class="sp">SOL/USDT</span><span><span class="pill pl">LONG</span></span><span><span class="pill po">ABIERTA</span></span><span class="dim">$124.80</span><span style="color:var(--blue-light);font-weight:700;font-variant-numeric:tabular-nums">+0.90%</span><span class="dim">6h atrás</span></div>
+    <div class="sr"><span class="sp">BTC/USDT</span><span><span class="pill ps">SHORT</span></span><span><span class="pill px">PERDIDA</span></span><span class="dim">$84,100</span><span class="dn" style="font-weight:700;font-variant-numeric:tabular-nums">-2.00%</span><span class="dim">10h atrás</span></div>
+    <div class="sr"><span class="sp">ETH/USDT</span><span><span class="pill pl">LONG</span></span><span><span class="pill pw">GANADA</span></span><span class="dim">$1,912</span><span class="up" style="font-weight:700;font-variant-numeric:tabular-nums">+2.60%</span><span class="dim">14h atrás</span></div>
+  </div>
+  <div style="text-align:center;margin-top:28px">
+    <a href="stats.html" style="display:inline-block;border:1px solid var(--border);color:var(--text-sec);padding:13px 30px;border-radius:var(--radius-md);font-size:14px;font-weight:600;transition:all 0.2s" onmouseenter="this.style.borderColor='rgba(59,130,246,0.35)';this.style.color='#fff'" onmouseleave="this.style.borderColor='';this.style.color=''">Ver historial completo →</a>
+  </div>
+</div>
+
+<!-- ─── INDICATORS ─────────────────────────────────────────────────── -->
+<div class="dsec-wrap">
+  <div class="dsec">
+    <div class="eyebrow">Tecnología</div>
+    <h2 class="sec-h2">La inteligencia<br>detrás de cada señal.</h2>
+    <p class="sec-sub">500+ indicadores procesados cada 5 minutos. Aquí una parte de lo que analiza el sistema.</p>
+    <div class="ig">
+      <div class="ic">
+        <h4>Flujo de órdenes</h4>
+        <ul class="il">
+          <li><div class="id"></div>Delta de volumen acumulado</li>
+          <li><div class="id"></div>Ratio compra / venta</li>
+          <li><div class="id"></div>Desequilibrio order book</li>
+          <li><div class="id"></div>Flujo de mercado</li>
+        </ul>
+      </div>
+      <div class="ic">
+        <h4>Posicionamiento</h4>
+        <ul class="il">
+          <li><div class="id"></div>Delta ballenas vs retail</li>
+          <li><div class="id"></div>Ratio largo / corto</li>
+          <li><div class="id"></div>Cambios en OI</li>
+          <li><div class="id"></div>Tasa de financiación</li>
+        </ul>
+      </div>
+      <div class="ic">
+        <h4>Liquidez</h4>
+        <ul class="il">
+          <li><div class="id"></div>Mapas de liquidaciones</li>
+          <li><div class="id"></div>Niveles anclados</li>
+          <li><div class="id"></div>Distribución de apalancamiento</li>
+        </ul>
+      </div>
+      <div class="ic">
+        <h4>Momentum</h4>
+        <ul class="il">
+          <li><div class="id"></div>DPO oscilador de precio</li>
+          <li><div class="id"></div>Divergencias RSI</li>
+          <li><div class="id"></div>Patrones MACD</li>
+          <li><div class="id"></div>Bandas de Bollinger</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── CTA ────────────────────────────────────────────────────────── -->
+<div class="ctas" style="padding-top:88px">
+  <div class="ctab">
+    <h2>El mercado no espera.<br>Tu sistema tampoco debería.</h2>
+    <p>Empieza con nuestro plan gratuito. Señales con 30 minutos de delay. Actualiza cuando veas los resultados — sin presión, sin permanencia.</p>
+    <div class="cta-btns">
+      <a href="#" class="btn-cw">Crear cuenta gratis</a>
+      <a href="stats.html" class="btn-co">Ver track record →</a>
+    </div>
+    <p class="cta-note">Sin tarjeta de crédito · Cancela cuando quieras · Soporte en español</p>
+  </div>
+</div>
+
+<!-- ─── FOOTER ─────────────────────────────────────────────────────── -->
+<div class="footer-wrap">
+  <footer>
+    <div class="ft">
+      <div>
+        <div class="fb">
+          <svg width="28" height="28" viewBox="0 0 36 36" fill="none">
+            <rect width="36" height="36" rx="9" fill="url(#logoGrad2)"/>
+            <defs><linearGradient id="logoGrad2" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse"><stop stop-color="#1652f0"/><stop offset="1" stop-color="#3b82f6"/></linearGradient></defs>
+            <rect x="7" y="24" width="4" height="7" rx="1.5" fill="white" opacity="0.35"/>
+            <rect x="7" y="20" width="4" height="3.5" rx="1" fill="white"/>
+            <rect x="13" y="17" width="4" height="14" rx="1.5" fill="white" opacity="0.35"/>
+            <rect x="13" y="12" width="4" height="4.5" rx="1" fill="white"/>
+            <rect x="19" y="22" width="4" height="9" rx="1.5" fill="#00d395" opacity="0.35"/>
+            <rect x="19" y="16" width="4" height="5.5" rx="1" fill="#00d395"/>
+            <rect x="25" y="19" width="4" height="12" rx="1.5" fill="#00d395" opacity="0.35"/>
+            <rect x="25" y="13" width="4" height="5.5" rx="1" fill="#00d395"/>
+            <path d="M9 23L15 16L21 20L27 14" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+          </svg>
+          <div style="line-height:1.1">
+            <div style="font-size:15px;font-weight:800;letter-spacing:-0.3px">AlphaChain</div>
+            <div style="font-size:9px;letter-spacing:2px;color:rgba(180,205,255,0.3);text-transform:uppercase;font-weight:600">Bots</div>
+          </div>
+        </div>
+        <p class="fd">Señales de trading cripto con inteligencia artificial y ejecución automática en tiempo real.</p>
+      </div>
+      <div>
+        <h5>Producto</h5>
+        <ul class="fl">
+          <li><a href="tools.html">Herramientas gratuitas</a></li>
+          <li><a href="charts.html">Charts en vivo</a></li>
+          <li><a href="stats.html">Estadísticas</a></li>
+          <li><a href="precios.html">Precios</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Legal</h5>
+        <ul class="fl">
+          <li><a href="legal.html">Términos de servicio</a></li>
+          <li><a href="legal.html#privacidad">Privacidad</a></li>
+          <li><a href="legal.html#riesgo">Riesgos</a></li>
+          <li><a href="legal.html#cookies">Cookies</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Soporte</h5>
+        <ul class="fl">
+          <li><a href="faq.html">FAQ</a></li>
+          <li><a href="mailto:soporte@alphachainbots.com">Contacto</a></li>
+          <li><a href="stats.html">Novedades</a></li>
+          <li><a href="precios.html">Planes</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="fbot">
+      <span class="fcp">© 2026 AlphaChainBots. Todos los derechos reservados.</span>
+      <span class="fcp">AlphaChainBots no es un asesor de inversiones registrado.</span>
+    </div>
+  </footer>
+  <div class="risk-bar"><p>⚠ Aviso de riesgo: El trading de criptomonedas conlleva un riesgo sustancial de pérdida y no es apto para todos los inversores. Las señales e información de AlphaChainBots son únicamente educativas e informativas y no constituyen asesoramiento financiero. El rendimiento pasado no garantiza resultados futuros. Nunca inviertas dinero que no puedas permitirte perder.</p></div>
+</div>
+
+<script>
+window.addEventListener('scroll',()=>{document.getElementById('nav').classList.toggle('scrolled',scrollY>20);});
+
+/* precio en tiempo real */
+(function(){
+  function updateCard(p,chg,vol){
+    const el=document.getElementById('hero-price');
+    if(el){
+      const prev=parseFloat(el.dataset.prev||p);
+      el.textContent='$'+p.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+      el.style.color=p>prev?'#00d395':p<prev?'#f44f4f':'#ffffff';
+      setTimeout(()=>el.style.color='#ffffff',400);
+      el.dataset.prev=p;
+    }
+    if(chg!==null){const cb=document.getElementById('hero-chg');if(cb){cb.textContent=(chg>=0?'↑ +':'↓ ')+Math.abs(chg).toFixed(2)+'% hoy';cb.className='dc-badge '+(chg>=0?'up-b':'dn-b');}}
+    if(vol!==null){const vb=document.getElementById('hero-vol');if(vb){const v=vol>=1e9?'$'+(vol/1e9).toFixed(1)+'B':'$'+(vol/1e6).toFixed(0)+'M';vb.textContent='Vol 24h: '+v;}}
+  }
+  function connect(){
+    try{
+      const ws=new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@miniTicker');
+      ws.onmessage=function(evt){
+        try{const d=JSON.parse(evt.data);updateCard(+d.c,(+d.c-+d.o)/(+d.o)*100,+d.q);}catch(e){}
+      };
+      ws.onerror=()=>ws.close();
+      ws.onclose=()=>setTimeout(connect,3000);
+    }catch(e){
+      (async function tick(){
+        try{const d=await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT').then(r=>r.json());updateCard(+d.lastPrice,+d.priceChangePercent,+d.quoteVolume);}catch(e){}
+        setTimeout(tick,3000);
+      })();
+    }
+  }
+  connect();
+})();
+
+/* MINI CHART */
+(function(){
+  const cv=document.getElementById('mini-c');
+  if(!cv)return;
+
+  const DPR=Math.min(window.devicePixelRatio||1,3);
+  const VISIBLE=80, MAX=VISIBLE+10;
+  let closed=[],live=null,ctx=null,cW=0,cH=0;
+
+  cv.style.cssText='display:block;margin:0;border:none;padding:0;background:transparent';
+
+  async function seed(){
+    try{
+      const d=await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1s&limit='+(VISIBLE+1)).then(r=>r.json());
+      closed=d.slice(0,-1).map(k=>({o:+k[1],h:+k[2],l:+k[3],c:+k[4],t:+k[0]/1000}));
+      const L=d[d.length-1];
+      live={o:+L[1],h:+L[2],l:+L[3],c:+L[4],t:+L[0]/1000};
+    }catch(e){
+      try{
+        const d=await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit='+VISIBLE).then(r=>r.json());
+        const now=Date.now()/1000;
+        closed=d.map((k,i)=>({o:+k[1],h:+k[2],l:+k[3],c:+k[4],t:now-(d.length-1-i)*60}));
+      }catch(e2){}
+    }
+  }
+
+  function connect(){
+    try{
+      const ws=new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@kline_1s');
+      ws.onmessage=function(e){
+        try{
+          const k=JSON.parse(e.data).k;
+          live={o:+k.o,h:+k.h,l:+k.l,c:+k.c,t:+k.t/1000};
+          if(k.x){closed.push({...live});if(closed.length>MAX)closed.shift();live=null;}
+        }catch(_){}
+      };
+      ws.onerror=()=>ws.close();
+      ws.onclose=()=>setTimeout(connect,3000);
+    }catch(_){}
+  }
+
+  function snap(v){return(Math.round(v*DPR)+0.5)/DPR;}
+
+  function loop(){
+    const cont=cv.parentElement;
+    const W=cont.offsetWidth;
+    const H=cont.offsetHeight;
+    if(W!==cW||H!==cH){
+      cv.width=Math.round(W*DPR);
+      cv.height=Math.round(H*DPR);
+      cv.style.width=W+'px';
+      cv.style.height=H+'px';
+      cW=W;cH=H;
+      ctx=cv.getContext('2d');
+    }
+    if(!ctx){requestAnimationFrame(loop);return;}
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    ctx.clearRect(0,0,W,H);
+    const all=[...closed];
+    if(live)all.push(live);
+    if(all.length<2){requestAnimationFrame(loop);return;}
+    const chartTop=H*0.10,chartBot=H*0.90,chartH=chartBot-chartTop;
+    const padX=4;
+    const slotW=(W-padX*2)/VISIBLE;
+    const candleW=Math.max(slotW*0.72,1);
+    const prices=all.flatMap(c=>[c.h,c.l]);
+    const mn=Math.min(...prices),mx=Math.max(...prices),rng=mx-mn||1;
+    const toY=v=>chartBot-((v-mn)/rng)*chartH;
+    const nowSec=Date.now()/1000;
+    ctx.save();
+    ctx.beginPath();ctx.rect(0,0,W,H);ctx.clip();
+    all.forEach(c=>{
+      const xc=(W-padX)-(nowSec-c.t)*slotW;
+      const xl=xc-candleW/2;
+      if(xl+candleW<0||xl>W)return;
+      const isLive=live!==null&&c===live;
+      const bull=c.c>=c.o;
+      const rgb=bull?'0,211,149':'244,79,79';
+      const alpha=isLive?1:0.88;
+      ctx.strokeStyle=`rgba(${rgb},${alpha})`;
+      ctx.lineWidth=1/DPR;
+      ctx.beginPath();ctx.moveTo(snap(xc),toY(c.h));ctx.lineTo(snap(xc),toY(c.l));ctx.stroke();
+      const bT=Math.round(Math.min(toY(c.o),toY(c.c)));
+      const bH2=Math.max(Math.round(Math.abs(toY(c.c)-toY(c.o))),1);
+      const bL=Math.round(xl),bW=Math.max(Math.round(candleW),1);
+      ctx.fillStyle=`rgba(${rgb},${alpha})`;
+      ctx.fillRect(bL,bT,bW,bH2);
+      if(isLive){
+        const p=0.35+0.3*Math.sin(Date.now()/220);
+        ctx.shadowColor=bull?'#00d395':'#f44f4f';
+        ctx.shadowBlur=8*p;
+        ctx.fillStyle=`rgba(${rgb},${0.6+p*0.35})`;
+        ctx.fillRect(bL,bT,bW,bH2);
+        ctx.shadowBlur=0;
+      }
+    });
+    ctx.restore();
+    requestAnimationFrame(loop);
+  }
+
+  seed().then(()=>{connect();loop();});
+})();
+</script>
+</body>
+</html>

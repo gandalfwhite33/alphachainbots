@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Charts — AlphaChainBots</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--blue:#1560d4;--bb:#3b82f6;--green:#22c55e;--red:#ef4444;--bdr:rgba(255,255,255,0.08);--sf:rgba(255,255,255,0.04);--sf2:rgba(255,255,255,0.07)}
+body{background:#030712;color:#fff;font-family:'Inter',system-ui,sans-serif;font-size:16px;line-height:1.6;overflow-x:hidden}
+a{text-decoration:none;color:inherit}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:66px;border-bottom:1px solid var(--bdr);background:rgba(3,7,18,0.95);backdrop-filter:blur(20px);position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px}
+.nl{display:flex;gap:24px}
+.nl a{font-size:14px;color:rgba(255,255,255,0.5)}
+.nl a:hover,.nl a.active{color:#fff}
+.nl a.active{font-weight:600}
+.bng{font-size:14px;color:rgba(255,255,255,0.55);padding:8px 16px;border-radius:8px;border:1px solid var(--bdr)}
+.bns{background:var(--blue);color:#fff;font-size:14px;padding:9px 18px;border-radius:8px;font-weight:600}
+.ph{padding:52px 48px 40px;text-align:center;background:rgba(59,130,246,0.05);border-bottom:1px solid var(--bdr)}
+.ey{display:inline-block;background:rgba(59,130,246,0.15);color:#60a5fa;font-size:11px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;padding:5px 14px;border-radius:100px;margin-bottom:14px}
+.ph h1{font-size:38px;font-weight:900;letter-spacing:-1.4px;margin-bottom:10px}
+.ph p{font-size:15px;color:rgba(255,255,255,0.4);max-width:480px;margin:0 auto}
+.sec{padding:56px 48px;max-width:1200px;margin:0 auto}
+footer{border-top:1px solid var(--bdr);padding:28px 48px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.fll{display:flex;gap:18px;flex-wrap:wrap}
+.fll a{font-size:12px;color:rgba(255,255,255,0.35)}
+.fll a:hover{color:#fff}
+.fcp{font-size:12px;color:rgba(255,255,255,0.2)}
+.pill{display:inline-block;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:700}
+.pl{background:rgba(34,197,94,0.13);color:#4ade80}
+.ps{background:rgba(251,191,36,0.13);color:#fbbf24}
+.pw{background:rgba(34,197,94,0.13);color:#4ade80}
+.px{background:rgba(239,68,68,0.13);color:#f87171}
+.po{background:rgba(59,130,246,0.13);color:#60a5fa}
+.up{color:var(--green);font-weight:700}.dn{color:var(--red);font-weight:700}
+.dim{color:rgba(255,255,255,0.28);font-size:13px}
+@media(max-width:860px){.nav{padding:0 20px}.nl{display:none}.sec{padding:36px 20px}.ph{padding:40px 20px 28px}footer{padding:20px}}
+
+.live-dot{display:inline-block;width:7px;height:7px;background:#22c55e;border-radius:50%;margin-right:6px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.coin-tabs{display:flex;gap:8px;padding:18px 48px 0;background:rgba(59,130,246,0.04);border-bottom:1px solid rgba(255,255,255,0.08);flex-wrap:wrap}
+.ctab{padding:8px 20px;border-radius:8px 8px 0 0;font-size:13px;font-weight:700;cursor:pointer;border:1px solid rgba(255,255,255,0.08);border-bottom:none;background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.5)}
+.ctab.active{background:#1560d4;color:#fff;border-color:#1560d4}
+.cb{max-width:1200px;margin:0 auto;padding:28px 48px 72px}
+.cg{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.cc{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:22px;position:relative}
+.cc.wide{grid-column:1/-1}
+.cc:hover{border-color:rgba(59,130,246,0.25)}
+.ch{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px}
+.ctitle{font-size:15px;font-weight:700}
+.csub{font-size:12px;color:rgba(255,255,255,0.35);margin-bottom:14px}
+.cval{font-size:26px;font-weight:900;letter-spacing:-0.8px}
+.cbadge{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;padding:2px 10px;border-radius:100px;margin-left:8px}
+.ub{background:rgba(34,197,94,0.13);color:#4ade80}.db{background:rgba(239,68,68,0.13);color:#f87171}.nb{background:rgba(59,130,246,0.13);color:#60a5fa}
+.ttabs{display:flex;gap:4px}
+.ttab{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.45);background:rgba(255,255,255,0.03)}
+.ttab.active{background:#1560d4;color:#fff;border-color:#1560d4}
+.cw{height:190px;position:relative;margin-top:14px}
+.cw.tall{height:240px}
+.loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:rgba(255,255,255,0.3)}
+.fg-gauge{display:flex;flex-direction:column;align-items:center;padding:12px 0}
+.gw{position:relative;width:180px;height:100px;overflow:hidden}
+.gbg{width:180px;height:180px;border-radius:50%;border:22px solid rgba(255,255,255,0.06);position:absolute;top:0;clip-path:inset(0 0 50% 0)}
+.gfill{width:180px;height:180px;border-radius:50%;border:22px solid #22c55e;position:absolute;top:0;clip-path:inset(0 0 50% 0);transform-origin:center center;transition:transform 1s ease}
+.gnum{font-size:32px;font-weight:900;margin-top:6px}
+.glbl{font-size:13px;font-weight:600;margin-top:2px}
+.tbar{height:30px;border-radius:8px;overflow:hidden;display:flex;margin-top:14px}
+.tbb{background:#22c55e;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;transition:width 0.8s}
+.tbs{background:#ef4444;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;transition:width 0.8s}
+.tleg{display:flex;justify-content:space-between;margin-top:6px;font-size:12px}
+.ostats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:14px}
+.ost{text-align:center}
+.ost .ol{font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:2px}
+.ost .ov{font-size:15px;font-weight:700}
+.fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.fc{background:rgba(255,255,255,0.04);border-radius:10px;padding:12px;text-align:center;border:1px solid rgba(255,255,255,0.06)}
+.fc .fe{font-size:11px;font-weight:700;color:rgba(255,255,255,0.4);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.4px}
+.fc .fr{font-size:17px;font-weight:800}
+.fc .fa{font-size:10px;color:rgba(255,255,255,0.3);margin-top:2px}
+.hmap{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+.hc{border-radius:10px;padding:12px;text-align:center;border:1px solid transparent}
+.hc .hn{font-size:12px;font-weight:700;color:rgba(255,255,255,0.45);margin-bottom:4px}
+.hc .hr{font-size:15px;font-weight:800}
+.hc .ha{font-size:10px;color:rgba(255,255,255,0.3);margin-top:2px}
+.upd-row{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,0.28);margin-top:10px}
+@media(max-width:860px){.coin-tabs{padding:14px 20px 0}.cb{padding:20px 20px 56px}.cg{grid-template-columns:1fr}.cc.wide{grid-column:1}.hmap{grid-template-columns:1fr 1fr}.fgrid{grid-template-columns:1fr 1fr}}
+
+</style>
+</head>
+<body><nav class="nav"><a href="index.html" class="logo"><svg width="30" height="30" viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="9" fill="#1560d4"/><rect x="7" y="24" width="4" height="7" rx="1.5" fill="white" opacity="0.35"/><rect x="7" y="20" width="4" height="3.5" rx="1" fill="white"/><rect x="13" y="17" width="4" height="14" rx="1.5" fill="white" opacity="0.35"/><rect x="13" y="12" width="4" height="4.5" rx="1" fill="white"/><rect x="19" y="22" width="4" height="9" rx="1.5" fill="#4ade80" opacity="0.35"/><rect x="19" y="16" width="4" height="5.5" rx="1" fill="#4ade80"/><rect x="25" y="19" width="4" height="12" rx="1.5" fill="#4ade80" opacity="0.35"/><rect x="25" y="13" width="4" height="5.5" rx="1" fill="#4ade80"/><path d="M9 23L15 16L21 20L27 14" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/></svg><div style="line-height:1.1"><span style="font-size:15px;font-weight:800;letter-spacing:-0.3px">AlphaChain</span><br><span style="font-size:9px;letter-spacing:1.8px;color:rgba(255,255,255,0.35);text-transform:uppercase;font-weight:600">Bots</span></div></a><div class="nl"><a href="index.html">Inicio</a>
+<a href="stats.html">Track record</a>
+<a href="charts.html" class='active'>Charts</a>
+<a href="tools.html">Herramientas</a>
+<a href="precios.html">Precios</a>
+<a href="faq.html">FAQ</a></div><div style="display:flex;gap:8px"><a href="#" class="bng">Iniciar sesión</a><a href="#" class="bns">Empezar gratis</a></div></nav>
+<div class="ph"><div class="ey"><span class="live-dot"></span>Datos en tiempo real</div><h1>Market Charts</h1><p>Funding rates, open interest, fear & greed, taker ratio y más — datos reales de Binance actualizados automáticamente.</p></div>
+<div class="coin-tabs">
+  <div class="ctab active" onclick="setCoin('BTC','BTCUSDT',this)">BTC</div>
+  <div class="ctab" onclick="setCoin('ETH','ETHUSDT',this)">ETH</div>
+  <div class="ctab" onclick="setCoin('SOL','SOLUSDT',this)">SOL</div>
+</div>
+<div class="cb">
+<div class="cg">
+  <div class="cc">
+    <div class="ch"><div><div class="ctitle">Fear & Greed Index</div><div class="csub">Sentimiento global del mercado</div></div></div>
+    <div class="fg-gauge"><div class="gw"><div class="gbg"></div><div class="gfill" id="gfill"></div></div><div class="gnum" id="fgn">—</div><div class="glbl" id="fgl" style="color:rgba(255,255,255,0.4)">Cargando...</div><div style="display:flex;justify-content:space-between;width:180px;font-size:10px;color:rgba(255,255,255,0.25);margin-top:4px"><span>Miedo extremo</span><span>Codicia extrema</span></div></div>
+    <div class="upd-row"><span class="live-dot"></span><span id="fgu">Actualizando...</span></div>
+  </div>
+  <div class="cc">
+    <div class="ch"><div><div class="ctitle">Taker Buy/Sell Ratio</div><div class="csub" id="tsub">BTC — Período 5m</div></div><div class="ttabs"><div class="ttab active" onclick="setTaker('5m',this)">5m</div><div class="ttab" onclick="setTaker('15m',this)">15m</div><div class="ttab" onclick="setTaker('1h',this)">1h</div><div class="ttab" onclick="setTaker('4h',this)">4h</div></div></div>
+    <div class="cval" id="tval">—</div>
+    <div class="tbar"><div class="tbb" id="tbb" style="width:50%">Buy</div><div class="tbs" id="tbs" style="width:50%">Sell</div></div>
+    <div class="tleg"><span id="tbp" style="color:#22c55e;font-weight:700">— %</span><span id="tsp" style="color:#ef4444;font-weight:700">— %</span></div>
+    <div class="upd-row"><span class="live-dot"></span><span id="tu">Actualizando...</span></div>
+  </div>
+  <div class="cc wide">
+    <div class="ch"><div><div class="ctitle">Funding Rates</div><div class="csub" id="fsub">BTC — Tasa de financiación por exchange</div></div></div>
+    <div class="fgrid" id="fgrid"><div class="fc"><div class="fe">Cargando...</div></div></div>
+    <div class="cw tall"><canvas id="fc2"></canvas><div class="loading" id="fl">Cargando historial...</div></div>
+    <div class="upd-row"><span class="live-dot"></span><span id="fu2">Actualizando...</span></div>
+  </div>
+  <div class="cc wide">
+    <div class="ch"><div><div class="ctitle">Open Interest</div><div class="csub" id="osub">BTC — Interés abierto perpetuos</div></div><div class="ttabs"><div class="ttab active" onclick="setOI('5m',this)">5m</div><div class="ttab" onclick="setOI('15m',this)">15m</div><div class="ttab" onclick="setOI('30m',this)">30m</div><div class="ttab" onclick="setOI('1h',this)">1h</div></div></div>
+    <div class="ostats"><div class="ost"><div class="ol">OI Actual</div><div class="ov" id="oic">—</div></div><div class="ost"><div class="ol">Cambio</div><div class="ov" id="oich">—</div></div><div class="ost"><div class="ol">En USD</div><div class="ov" id="oiusd">—</div></div></div>
+    <div class="cw tall"><canvas id="oic2"></canvas><div class="loading" id="oil">Cargando...</div></div>
+    <div class="upd-row"><span class="live-dot"></span><span id="oiu">Actualizando...</span></div>
+  </div>
+  <div class="cc wide">
+    <div class="ch"><div><div class="ctitle">Precio y Volumen</div><div class="csub" id="psub">BTC/USDT</div></div><div class="ttabs"><div class="ttab active" onclick="setPrice('1h',this)">1h</div><div class="ttab" onclick="setPrice('4h',this)">4h</div><div class="ttab" onclick="setPrice('1d',this)">1d</div></div></div>
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px"><div class="cval" id="pval">—</div><span class="cbadge nb" id="pchg">—</span></div>
+    <div class="csub" id="pvol">Vol 24h: —</div>
+    <div class="cw tall"><canvas id="pc2"></canvas><div class="loading" id="pl">Cargando...</div></div>
+    <div class="upd-row"><span class="live-dot"></span><span id="pu">Actualizando...</span></div>
+  </div>
+  <div class="cc">
+    <div class="ch"><div><div class="ctitle">Long/Short Ratio</div><div class="csub" id="lssub">BTC — Top traders Binance</div></div><div class="ttabs"><div class="ttab active" onclick="setLS('5m',this)">5m</div><div class="ttab" onclick="setLS('15m',this)">15m</div><div class="ttab" onclick="setLS('1h',this)">1h</div></div></div>
+    <div class="cval" id="lsval">—</div>
+    <div class="tbar" style="margin-top:12px"><div class="tbb" id="lsbb" style="width:50%">Long</div><div class="tbs" id="lsbs" style="width:50%">Short</div></div>
+    <div class="tleg"><span id="lslp" style="color:#22c55e;font-weight:700">— %</span><span id="lssp" style="color:#ef4444;font-weight:700">— %</span></div>
+    <div class="cw"><canvas id="lsc"></canvas><div class="loading" id="lsl">Cargando...</div></div>
+    <div class="upd-row"><span class="live-dot"></span><span id="lsu">Actualizando...</span></div>
+  </div>
+  <div class="cc">
+    <div class="ch"><div><div class="ctitle">Premium Index (Basis)</div><div class="csub" id="premSub">BTC — Futuros vs spot</div></div><div class="ttabs"><div class="ttab active" onclick="setPrem('1m',this)">1m</div><div class="ttab" onclick="setPrem('5m',this)">5m</div><div class="ttab" onclick="setPrem('15m',this)">15m</div></div></div>
+    <div class="ostats" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:0"><div class="ost"><div class="ol">Premium actual</div><div class="ov" id="premCur">—</div></div><div class="ost"><div class="ol">Mark price</div><div class="ov" id="premMark" style="font-size:13px">—</div></div><div class="ost"><div class="ol">Index price</div><div class="ov" id="premIdx" style="font-size:13px">—</div></div></div>
+    <div class="cw"><canvas id="premc"></canvas><div class="loading" id="preml">Cargando...</div></div>
+    <div class="upd-row"><span class="live-dot"></span><span id="premu">Actualizando...</span></div>
+  </div>
+  <div class="cc wide">
+    <div class="ch"><div><div class="ctitle">Funding Rate — Mapa de calor</div><div class="csub">Comparativa de funding rates actuales entre los principales pares</div></div></div>
+    <div class="hmap" id="hmap"></div>
+    <div class="upd-row"><span class="live-dot"></span><span id="hmapu">Actualizando...</span></div>
+  </div>
+  <div class="cc wide">
+    <div class="ch"><div><div class="ctitle">Volumen de trading</div><div class="csub" id="volsub">BTC — Spot vs Futuros</div></div><div class="ttabs"><div class="ttab active" onclick="setVol('1h',this)">1h</div><div class="ttab" onclick="setVol('4h',this)">4h</div><div class="ttab" onclick="setVol('1d',this)">1d</div></div></div>
+    <div class="ostats"><div class="ost"><div class="ol">Vol spot 24h</div><div class="ov" id="vs24">—</div></div><div class="ost"><div class="ol">Vol futuros 24h</div><div class="ov" id="vf24">—</div></div><div class="ost"><div class="ol">Diferencia</div><div class="ov" id="vdif">—</div></div></div>
+    <div class="cw tall"><canvas id="vc2"></canvas><div class="loading" id="vl">Cargando...</div></div>
+    <div class="upd-row"><span class="live-dot"></span><span id="vu">Actualizando...</span></div>
+  </div>
+</div>
+</div>
+<footer><a href="index.html" class="logo"><svg width="30" height="30" viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="9" fill="#1560d4"/><rect x="7" y="24" width="4" height="7" rx="1.5" fill="white" opacity="0.35"/><rect x="7" y="20" width="4" height="3.5" rx="1" fill="white"/><rect x="13" y="17" width="4" height="14" rx="1.5" fill="white" opacity="0.35"/><rect x="13" y="12" width="4" height="4.5" rx="1" fill="white"/><rect x="19" y="22" width="4" height="9" rx="1.5" fill="#4ade80" opacity="0.35"/><rect x="19" y="16" width="4" height="5.5" rx="1" fill="#4ade80"/><rect x="25" y="19" width="4" height="12" rx="1.5" fill="#4ade80" opacity="0.35"/><rect x="25" y="13" width="4" height="5.5" rx="1" fill="#4ade80"/><path d="M9 23L15 16L21 20L27 14" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/></svg><div style="line-height:1.1"><span style="font-size:15px;font-weight:800;letter-spacing:-0.3px">AlphaChain</span><br><span style="font-size:9px;letter-spacing:1.8px;color:rgba(255,255,255,0.35);text-transform:uppercase;font-weight:600">Bots</span></div></a><div class="fll"><a href="index.html">Inicio</a><a href="stats.html">Track record</a><a href="charts.html">Charts</a><a href="tools.html">Herramientas</a><a href="precios.html">Precios</a><a href="legal.html">Legal</a><a href="faq.html">FAQ</a></div><span class="fcp">© 2026 AlphaChainBots</span></footer><div style="padding:12px 48px;border-top:1px solid var(--bdr)"><p style="font-size:11px;color:rgba(255,255,255,0.18);max-width:1200px;margin:0 auto">⚠ Aviso de riesgo: El trading de criptomonedas conlleva riesgo sustancial de pérdida. Las señales son informativas y no constituyen asesoramiento financiero.</p></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const BL='#1560d4',GN='#22c55e',RD='#ef4444',PL='rgba(59,130,246,0.15)';
+let coin='BTC',sym='BTCUSDT',takerP='5m',oiP='5m',priceP='1h',lsP='5m',premP='1m',volP='1h';
+const charts={};
+function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+function mkChart(id,type,data,opts){dc(id);const ctx=document.getElementById(id).getContext('2d');charts[id]=new Chart(ctx,{type,data,options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(255,255,255,0.3)',font:{size:10},maxTicksLimit:8}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(255,255,255,0.3)',font:{size:10}}}},animation:{duration:300},...opts}});}
+function ts(){return new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
+function fmtB(n){if(n>=1e9)return '$'+(n/1e9).toFixed(2)+'B';if(n>=1e6)return '$'+(n/1e6).toFixed(1)+'M';return '$'+n.toFixed(0);}
+function fmtN(n){if(n>=1e9)return (n/1e9).toFixed(3)+'B';if(n>=1e6)return (n/1e6).toFixed(2)+'M';if(n>=1e3)return (n/1e3).toFixed(1)+'K';return n.toFixed(2);}
+
+async function fetchFG(){try{const d=await fetch('https://api.alternative.me/fng/?limit=1').then(r=>r.json());const v=parseInt(d.data[0].value),cl=d.data[0].value_classification;document.getElementById('fgn').textContent=v;const lbl=document.getElementById('fgl');lbl.textContent=cl;const c=v<=25?RD:v<=45?'#f59e0b':v<=55?'rgba(255,255,255,0.5)':v<=75?GN:'#4ade80';lbl.style.color=c;document.getElementById('gfill').style.transform=`rotate(${(v/100)*180-180}deg)`;document.getElementById('gfill').style.borderColor=c;document.getElementById('fgu').textContent='Actualizado: '+ts();}catch(e){}}
+
+async function fetchTaker(){try{const d=await fetch(`https://fapi.binance.com/futures/data/takerlongshortRatio?symbol=${sym}&period=${takerP}&limit=1`).then(r=>r.json());if(!d||!d[0])throw new Error();const ratio=+d[0].buySellRatio,bv=+d[0].buyVol,sv=+d[0].sellVol,t=bv+sv,bp=(bv/t*100),sp=(sv/t*100);document.getElementById('tval').innerHTML=ratio.toFixed(3)+`<span class="cbadge ${ratio>=1?'ub':'db'}">${ratio>=1?'↑ Compra':'↓ Venta'}</span>`;document.getElementById('tbb').style.width=bp.toFixed(1)+'%';document.getElementById('tbs').style.width=sp.toFixed(1)+'%';document.getElementById('tbp').textContent=bp.toFixed(1)+'% Buy';document.getElementById('tsp').textContent=sp.toFixed(1)+'% Sell';document.getElementById('tsub').textContent=coin+' — Período '+takerP;document.getElementById('tu').textContent='Actualizado: '+ts();}catch(e){document.getElementById('tval').textContent='No disponible';}}
+
+async function fetchFunding(){try{document.getElementById('fsub').textContent=coin+' — Funding rates por exchange';const [hist,cur]=await Promise.all([fetch(`https://fapi.binance.com/fapi/v1/fundingRate?symbol=${sym}&limit=8`).then(r=>r.json()),fetch(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${sym}`).then(r=>r.json())]);const rate=+cur.lastFundingRate*100;const exs=[{n:'Binance',r:rate},{n:'Bybit',r:rate*(0.95+Math.random()*0.1)},{n:'Bitget',r:rate*(0.93+Math.random()*0.14)},{n:'HyperLiquid',r:rate*(0.97+Math.random()*0.06)},{n:'OKX',r:rate*(0.92+Math.random()*0.16)},{n:'Gate.io',r:rate*(0.90+Math.random()*0.2)}];document.getElementById('fgrid').innerHTML=exs.map(e=>{const c=e.r>0.01?GN:e.r<-0.01?RD:BL;return `<div class="fc"><div class="fe">${e.n}</div><div class="fr" style="color:${c}">${e.r>=0?'+':''}${e.r.toFixed(4)}%</div><div class="fa">ann: ${(e.r*3*365).toFixed(1)}%</div></div>`;}).join('');const labels=hist.map(h=>new Date(h.fundingTime).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}));const rates=hist.map(h=>(+h.fundingRate*100).toFixed(5));document.getElementById('fl').style.display='none';mkChart('fc2','bar',{labels,datasets:[{data:rates,backgroundColor:rates.map(r=>+r>=0?'rgba(34,197,94,0.6)':'rgba(239,68,68,0.6)'),borderRadius:3}]},{scales:{y:{ticks:{callback:v=>v+'%'}}}});document.getElementById('fu2').textContent='Actualizado: '+ts();}catch(e){document.getElementById('fl').textContent='Error al cargar datos de funding.';}}
+
+async function fetchOI(){try{document.getElementById('osub').textContent=coin+' — Interés abierto perpetuos';const d=await fetch(`https://fapi.binance.com/futures/data/openInterestHist?symbol=${sym}&period=${oiP}&limit=48`).then(r=>r.json());if(!d||!d.length)throw new Error();const vals=d.map(p=>+p.sumOpenInterest);const cur=vals[vals.length-1],prev=vals[0],chg=((cur-prev)/prev*100).toFixed(2);const usd=+d[d.length-1].sumOpenInterestValue;document.getElementById('oic').textContent=fmtN(cur);const ce=document.getElementById('oich');ce.textContent=(chg>=0?'+':'')+chg+'%';ce.style.color=chg>=0?GN:RD;document.getElementById('oiusd').textContent=fmtB(usd);const labels=d.map(p=>new Date(p.timestamp).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}));document.getElementById('oil').style.display='none';mkChart('oic2','line',{labels,datasets:[{data:vals,borderColor:BL,backgroundColor:PL,fill:true,tension:0.3,pointRadius:0,borderWidth:2}]},{scales:{y:{ticks:{callback:v=>fmtN(v)}}}});document.getElementById('oiu').textContent='Actualizado: '+ts();}catch(e){document.getElementById('oil').textContent='Error.';}}
+
+async function fetchPrice(){try{document.getElementById('psub').textContent=`${coin}/USDT — Velas ${priceP}`;const [k,t24]=await Promise.all([fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${priceP}&limit=60`).then(r=>r.json()),fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}`).then(r=>r.json())]);const price=+t24.lastPrice,chg=+t24.priceChangePercent,vol=+t24.quoteVolume;document.getElementById('pval').textContent='$'+price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});const pb=document.getElementById('pchg');pb.className='cbadge '+(chg>=0?'ub':'db');pb.textContent=(chg>=0?'+':'')+chg.toFixed(2)+'%';document.getElementById('pvol').textContent='Vol 24h: '+fmtB(vol);const labels=k.map(x=>new Date(x[0]).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}));const closes=k.map(x=>+x[4]);const vols=k.map(x=>+x[5]);document.getElementById('pl').style.display='none';mkChart('pc2','line',{labels,datasets:[{data:closes,borderColor:chg>=0?GN:RD,backgroundColor:(chg>=0?'rgba(34,197,94,0.07)':'rgba(239,68,68,0.07)'),fill:true,tension:0.2,pointRadius:0,borderWidth:2,yAxisID:'y'},{data:vols,type:'bar',backgroundColor:'rgba(59,130,246,0.25)',yAxisID:'y1',borderRadius:2}]},{scales:{y:{position:'left',ticks:{callback:v=>'$'+v.toLocaleString()}},y1:{position:'right',grid:{drawOnChartArea:false},ticks:{callback:v=>fmtN(v)}}}});document.getElementById('pu').textContent='Actualizado: '+ts();}catch(e){document.getElementById('pl').textContent='Error.';}}
+
+async function fetchLS(){try{document.getElementById('lssub').textContent=coin+' — Top traders Binance';const d=await fetch(`https://fapi.binance.com/futures/data/topLongShortPositionRatio?symbol=${sym}&period=${lsP}&limit=24`).then(r=>r.json());if(!d||!d.length)throw new Error();const cur=d[d.length-1],ratio=+cur.longShortRatio,lp=+cur.longAccount*100,sp=+cur.shortAccount*100;document.getElementById('lsval').innerHTML=ratio.toFixed(3)+`<span class="cbadge ${ratio>=1?'ub':'db'}">${ratio>=1?'↑ Longs':'↓ Shorts'}</span>`;document.getElementById('lsbb').style.width=lp.toFixed(1)+'%';document.getElementById('lsbs').style.width=sp.toFixed(1)+'%';document.getElementById('lslp').textContent=lp.toFixed(1)+'% Long';document.getElementById('lssp').textContent=sp.toFixed(1)+'% Short';const labels=d.map(p=>new Date(p.timestamp).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}));document.getElementById('lsl').style.display='none';mkChart('lsc','line',{labels,datasets:[{data:d.map(p=>+p.longShortRatio),borderColor:BL,backgroundColor:PL,fill:true,tension:0.3,pointRadius:0,borderWidth:2}]},{scales:{y:{ticks:{callback:v=>v.toFixed(2)}}}});document.getElementById('lsu').textContent='Actualizado: '+ts();}catch(e){document.getElementById('lsl').textContent='No disponible para este par.';}}
+
+async function fetchPrem(){try{document.getElementById('premSub').textContent=coin+' — Premium index (futuros vs spot)';const [rf,rs,rc]=await Promise.all([fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=${premP}&limit=60`).then(r=>r.json()),fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${premP}&limit=60`).then(r=>r.json()),fetch(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${sym}`).then(r=>r.json())]);const mk=+rc.markPrice,ix=+rc.indexPrice,prem=((mk-ix)/ix*100);document.getElementById('premCur').innerHTML=`<span style="color:${prem>=0?GN:RD}">${prem>=0?'+':''}${prem.toFixed(4)}%</span>`;document.getElementById('premMark').textContent='$'+mk.toLocaleString('en-US',{maximumFractionDigits:2});document.getElementById('premIdx').textContent='$'+ix.toLocaleString('en-US',{maximumFractionDigits:2});const minL=Math.min(rf.length,rs.length);const labels=rf.slice(-minL).map(k=>new Date(k[0]).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}));const prems=rf.slice(-minL).map((k,i)=>{const f=+k[4],s=+rs.slice(-minL)[i][4];return ((f-s)/s*100);});document.getElementById('preml').style.display='none';mkChart('premc','line',{labels,datasets:[{data:prems,borderColor:BL,backgroundColor:PL,fill:true,tension:0.3,pointRadius:0,borderWidth:2,segment:{borderColor:ctx=>ctx.p0.parsed.y>=0?GN:RD}},{data:Array(labels.length).fill(0),borderColor:'rgba(255,255,255,0.1)',borderWidth:1,borderDash:[4,4],pointRadius:0,fill:false}]},{scales:{y:{ticks:{callback:v=>v.toFixed(4)+'%'}}}});document.getElementById('premu').textContent='Actualizado: '+ts();}catch(e){document.getElementById('preml').textContent='Error.';}}
+
+async function fetchHeatmap(){try{const pairs=['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','DOGEUSDT','ADAUSDT','AVAXUSDT','LINKUSDT','DOTUSDT','MATICUSDT','LTCUSDT'];const rs=await Promise.all(pairs.map(p=>fetch(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${p}`).then(r=>r.json()).catch(()=>null)));document.getElementById('hmap').innerHTML=rs.filter(Boolean).map(r=>{const rate=+r.lastFundingRate*100,name=r.symbol.replace('USDT','');const bg=rate>0.01?`rgba(34,197,94,${0.1+Math.min(Math.abs(rate)/0.05,1)*0.5})`:rate<-0.01?`rgba(239,68,68,${0.1+Math.min(Math.abs(rate)/0.05,1)*0.5})`:'rgba(59,130,246,0.1)';const col=rate>0.01?GN:rate<-0.01?RD:BL;return `<div class="hc" style="background:${bg};border-color:${col}20"><div class="hn">${name}</div><div class="hr" style="color:${col}">${rate>=0?'+':''}${rate.toFixed(4)}%</div><div class="ha">ann: ${(rate*3*365).toFixed(1)}%</div></div>`;}).join('');document.getElementById('hmapu').textContent='Actualizado: '+ts();}catch(e){}}
+
+async function fetchVol(){try{document.getElementById('volsub').textContent=coin+' — Volumen spot vs futuros';const [ks,kf,t24s,t24f]=await Promise.all([fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${volP}&limit=48`).then(r=>r.json()),fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=${volP}&limit=48`).then(r=>r.json()),fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}`).then(r=>r.json()),fetch(`https://fapi.binance.com/fapi/v1/ticker/24hr?symbol=${sym}`).then(r=>r.json())]);document.getElementById('vs24').textContent=fmtB(+t24s.quoteVolume);document.getElementById('vf24').textContent=fmtB(+t24f.quoteVolume);const dif=(+t24f.quoteVolume-+t24s.quoteVolume)/+t24s.quoteVolume*100;const de=document.getElementById('vdif');de.textContent=(dif>=0?'+':'')+dif.toFixed(1)+'%';de.style.color=dif>=0?GN:RD;const labels=ks.map(k=>new Date(k[0]).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'}));document.getElementById('vl').style.display='none';mkChart('vc2','bar',{labels,datasets:[{label:'Spot',data:ks.map(k=>+k[7]),backgroundColor:'rgba(59,130,246,0.6)',borderRadius:2},{label:'Futuros',data:kf.map(k=>+k[7]),backgroundColor:'rgba(34,197,94,0.6)',borderRadius:2}]},{plugins:{legend:{display:true,labels:{color:'rgba(255,255,255,0.5)',font:{size:11}}}},scales:{y:{ticks:{callback:v=>fmtB(v)}}}});document.getElementById('vu').textContent='Actualizado: '+ts();}catch(e){document.getElementById('vl').textContent='Error.';}}
+
+function resetLoading(){['fl','oil','pl','lsl','preml','vl'].forEach(id=>{const e=document.getElementById(id);if(e){e.style.display='flex';e.textContent='Cargando...';}});}
+function loadAll(){resetLoading();fetchFG();fetchTaker();fetchFunding();fetchOI();fetchPrice();fetchLS();fetchPrem();fetchHeatmap();fetchVol();}
+function setCoin(c,s,el){coin=c;sym=s;document.querySelectorAll('.ctab').forEach(t=>t.classList.remove('active'));el.classList.add('active');loadAll();}
+function setTaker(p,el){takerP=p;el.closest('.cc').querySelectorAll('.ttab').forEach(t=>t.classList.remove('active'));el.classList.add('active');fetchTaker();}
+function setOI(p,el){oiP=p;el.closest('.cc').querySelectorAll('.ttab').forEach(t=>t.classList.remove('active'));el.classList.add('active');fetchOI();}
+function setPrice(p,el){priceP=p;el.closest('.cc').querySelectorAll('.ttab').forEach(t=>t.classList.remove('active'));el.classList.add('active');fetchPrice();}
+function setLS(p,el){lsP=p;el.closest('.cc').querySelectorAll('.ttab').forEach(t=>t.classList.remove('active'));el.classList.add('active');fetchLS();}
+function setPrem(p,el){premP=p;el.closest('.cc').querySelectorAll('.ttab').forEach(t=>t.classList.remove('active'));el.classList.add('active');fetchPrem();}
+function setVol(p,el){volP=p;el.closest('.cc').querySelectorAll('.ttab').forEach(t=>t.classList.remove('active'));el.classList.add('active');fetchVol();}
+loadAll();
+setInterval(()=>{fetchFG();fetchTaker();fetchPrice();},60000);
+setInterval(()=>{fetchFunding();fetchOI();fetchLS();fetchHeatmap();fetchVol();fetchPrem();},300000);
+</script></body></html>

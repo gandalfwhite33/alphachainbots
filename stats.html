@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Track Record — AlphaChainBots</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--blue:#1560d4;--bb:#3b82f6;--green:#22c55e;--red:#ef4444;--bdr:rgba(255,255,255,0.08);--sf:rgba(255,255,255,0.04);--sf2:rgba(255,255,255,0.07)}
+body{background:#030712;color:#fff;font-family:'Inter',system-ui,sans-serif;font-size:16px;line-height:1.6;overflow-x:hidden}
+a{text-decoration:none;color:inherit}
+.nav{display:flex;align-items:center;justify-content:space-between;padding:0 48px;height:66px;border-bottom:1px solid var(--bdr);background:rgba(3,7,18,0.95);backdrop-filter:blur(20px);position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px}
+.nl{display:flex;gap:24px}
+.nl a{font-size:14px;color:rgba(255,255,255,0.5)}
+.nl a:hover,.nl a.active{color:#fff}
+.nl a.active{font-weight:600}
+.bng{font-size:14px;color:rgba(255,255,255,0.55);padding:8px 16px;border-radius:8px;border:1px solid var(--bdr)}
+.bns{background:var(--blue);color:#fff;font-size:14px;padding:9px 18px;border-radius:8px;font-weight:600}
+.ph{padding:52px 48px 40px;text-align:center;background:rgba(59,130,246,0.05);border-bottom:1px solid var(--bdr)}
+.ey{display:inline-block;background:rgba(59,130,246,0.15);color:#60a5fa;font-size:11px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;padding:5px 14px;border-radius:100px;margin-bottom:14px}
+.ph h1{font-size:38px;font-weight:900;letter-spacing:-1.4px;margin-bottom:10px}
+.ph p{font-size:15px;color:rgba(255,255,255,0.4);max-width:480px;margin:0 auto}
+.sec{padding:56px 48px;max-width:1200px;margin:0 auto}
+footer{border-top:1px solid var(--bdr);padding:28px 48px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.fll{display:flex;gap:18px;flex-wrap:wrap}
+.fll a{font-size:12px;color:rgba(255,255,255,0.35)}
+.fll a:hover{color:#fff}
+.fcp{font-size:12px;color:rgba(255,255,255,0.2)}
+.pill{display:inline-block;padding:3px 10px;border-radius:100px;font-size:11px;font-weight:700}
+.pl{background:rgba(34,197,94,0.13);color:#4ade80}
+.ps{background:rgba(251,191,36,0.13);color:#fbbf24}
+.pw{background:rgba(34,197,94,0.13);color:#4ade80}
+.px{background:rgba(239,68,68,0.13);color:#f87171}
+.po{background:rgba(59,130,246,0.13);color:#60a5fa}
+.up{color:var(--green);font-weight:700}.dn{color:var(--red);font-weight:700}
+.dim{color:rgba(255,255,255,0.28);font-size:13px}
+@media(max-width:860px){.nav{padding:0 20px}.nl{display:none}.sec{padding:36px 20px}.ph{padding:40px 20px 28px}footer{padding:20px}}
+
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:48px}
+.met{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:22px;text-align:center}
+.mv{font-size:34px;font-weight:900;letter-spacing:-1.5px;color:#60a5fa}
+.ml{font-size:13px;color:rgba(255,255,255,0.38);margin-top:6px}
+.ms{font-size:12px;color:#22c55e;margin-top:3px;font-weight:600}
+.fbts{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+.fb{padding:7px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.6)}
+.fb.on{background:#1560d4;color:#fff;border-color:#1560d4}
+.st{border:1px solid rgba(255,255,255,0.08);border-radius:16px;overflow:hidden}
+.sh{display:grid;grid-template-columns:110px 100px 100px 1fr 100px 120px;padding:12px 22px;background:rgba(255,255,255,0.03);font-size:11px;font-weight:700;letter-spacing:0.7px;text-transform:uppercase;color:rgba(255,255,255,0.28);border-bottom:1px solid rgba(255,255,255,0.06)}
+.sr{display:grid;grid-template-columns:110px 100px 100px 1fr 100px 120px;padding:14px 22px;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.04);align-items:center;transition:background 0.15s;cursor:default}
+.sr:last-child{border-bottom:none}.sr:hover{background:rgba(255,255,255,0.03)}
+.sp{font-weight:700}
+.chart-area{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:22px;margin-bottom:44px}
+.ct{font-size:14px;font-weight:700;margin-bottom:16px;color:rgba(255,255,255,0.7)}
+.bars{display:flex;align-items:flex-end;gap:5px;height:140px}
+.bw{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
+.bv{font-size:9px;font-weight:700}.bl{font-size:9px;color:rgba(255,255,255,0.3)}
+@media(max-width:860px){.metrics{grid-template-columns:1fr 1fr}.sh,.sr{grid-template-columns:90px 80px 80px 1fr}.sh>*:nth-child(5),.sh>*:nth-child(6),.sr>*:nth-child(5),.sr>*:nth-child(6){display:none}}
+
+</style>
+</head>
+<body><nav class="nav"><a href="index.html" class="logo"><svg width="30" height="30" viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="9" fill="#1560d4"/><rect x="7" y="24" width="4" height="7" rx="1.5" fill="white" opacity="0.35"/><rect x="7" y="20" width="4" height="3.5" rx="1" fill="white"/><rect x="13" y="17" width="4" height="14" rx="1.5" fill="white" opacity="0.35"/><rect x="13" y="12" width="4" height="4.5" rx="1" fill="white"/><rect x="19" y="22" width="4" height="9" rx="1.5" fill="#4ade80" opacity="0.35"/><rect x="19" y="16" width="4" height="5.5" rx="1" fill="#4ade80"/><rect x="25" y="19" width="4" height="12" rx="1.5" fill="#4ade80" opacity="0.35"/><rect x="25" y="13" width="4" height="5.5" rx="1" fill="#4ade80"/><path d="M9 23L15 16L21 20L27 14" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/></svg><div style="line-height:1.1"><span style="font-size:15px;font-weight:800;letter-spacing:-0.3px">AlphaChain</span><br><span style="font-size:9px;letter-spacing:1.8px;color:rgba(255,255,255,0.35);text-transform:uppercase;font-weight:600">Bots</span></div></a><div class="nl"><a href="index.html">Inicio</a>
+<a href="stats.html" class='active'>Track record</a>
+<a href="charts.html">Charts</a>
+<a href="tools.html">Herramientas</a>
+<a href="precios.html">Precios</a>
+<a href="faq.html">FAQ</a></div><div style="display:flex;gap:8px"><a href="#" class="bng">Iniciar sesión</a><a href="#" class="bns">Empezar gratis</a></div></nav>
+<div class="ph"><div class="ey">Historial verificado</div><h1>Track record completo</h1><p>Todas las señales enviadas. Ganas y pérdidas. Sin filtros.</p></div>
+<div class="sec">
+  <div class="metrics">
+    <div class="met"><div class="mv">+68.4%</div><div class="ml">Rendimiento 2025</div><div class="ms">Verificado</div></div>
+    <div class="met"><div class="mv">71%</div><div class="ml">Tasa de acierto</div><div class="ms">↑ 3.2% este mes</div></div>
+    <div class="met"><div class="mv">1,847</div><div class="ml">Señales totales</div><div class="ms">↑ 42 esta semana</div></div>
+    <div class="met"><div class="mv">2.4:1</div><div class="ml">Ratio ganancia/pérdida</div><div class="ms">Media 2025</div></div>
+  </div>
+  <div class="chart-area">
+    <div class="ct">Rendimiento mensual 2025 (%)</div>
+    <div class="bars" id="bars"></div>
+  </div>
+  <div class="fbts">
+    <button class="fb on" onclick="filter(this,'all')">Todas</button>
+    <button class="fb" onclick="filter(this,'win')">Ganadas</button>
+    <button class="fb" onclick="filter(this,'loss')">Perdidas</button>
+    <button class="fb" onclick="filter(this,'open')">Abiertas</button>
+    <button class="fb" onclick="filter(this,'btc')">BTC</button>
+    <button class="fb" onclick="filter(this,'eth')">ETH</button>
+    <button class="fb" onclick="filter(this,'sol')">SOL</button>
+  </div>
+  <div class="st">
+    <div class="sh"><span>Par</span><span>Dirección</span><span>Estado</span><span>Entrada</span><span>Variación</span><span>Hace</span></div>
+    <div class="sr" data-t="win" data-p="btc"><span class="sp">BTC/USDT</span><span><span class="pill pl">LONG</span></span><span><span class="pill pw">GANADA</span></span><span class="dim">$83,420</span><span class="up">+3.40%</span><span class="dim">2h atrás</span></div>
+    <div class="sr" data-t="win" data-p="eth"><span class="sp">ETH/USDT</span><span><span class="pill ps">SHORT</span></span><span><span class="pill pw">GANADA</span></span><span class="dim">$1,960</span><span class="up">+1.80%</span><span class="dim">4h atrás</span></div>
+    <div class="sr" data-t="open" data-p="sol"><span class="sp">SOL/USDT</span><span><span class="pill pl">LONG</span></span><span><span class="pill po">ABIERTA</span></span><span class="dim">$124.80</span><span style="color:#60a5fa;font-weight:700">+0.90%</span><span class="dim">6h atrás</span></div>
+    <div class="sr" data-t="loss" data-p="btc"><span class="sp">BTC/USDT</span><span><span class="pill ps">SHORT</span></span><span><span class="pill px">PERDIDA</span></span><span class="dim">$84,100</span><span class="dn">-2.00%</span><span class="dim">10h atrás</span></div>
+    <div class="sr" data-t="win" data-p="eth"><span class="sp">ETH/USDT</span><span><span class="pill pl">LONG</span></span><span><span class="pill pw">GANADA</span></span><span class="dim">$1,912</span><span class="up">+2.60%</span><span class="dim">14h atrás</span></div>
+    <div class="sr" data-t="win" data-p="sol"><span class="sp">SOL/USDT</span><span><span class="pill ps">SHORT</span></span><span><span class="pill pw">GANADA</span></span><span class="dim">$128.40</span><span class="up">+2.80%</span><span class="dim">Ayer 14:10</span></div>
+    <div class="sr" data-t="loss" data-p="eth"><span class="sp">ETH/USDT</span><span><span class="pill ps">SHORT</span></span><span><span class="pill px">PERDIDA</span></span><span class="dim">$1,944</span><span class="dn">-2.00%</span><span class="dim">Ayer 09:55</span></div>
+    <div class="sr" data-t="win" data-p="btc"><span class="sp">BTC/USDT</span><span><span class="pill pl">LONG</span></span><span><span class="pill pw">GANADA</span></span><span class="dim">$81,200</span><span class="up">+3.23%</span><span class="dim">20 Mar 16:30</span></div>
+  </div>
+</div>
+<footer><a href="index.html" class="logo"><svg width="30" height="30" viewBox="0 0 36 36" fill="none"><rect width="36" height="36" rx="9" fill="#1560d4"/><rect x="7" y="24" width="4" height="7" rx="1.5" fill="white" opacity="0.35"/><rect x="7" y="20" width="4" height="3.5" rx="1" fill="white"/><rect x="13" y="17" width="4" height="14" rx="1.5" fill="white" opacity="0.35"/><rect x="13" y="12" width="4" height="4.5" rx="1" fill="white"/><rect x="19" y="22" width="4" height="9" rx="1.5" fill="#4ade80" opacity="0.35"/><rect x="19" y="16" width="4" height="5.5" rx="1" fill="#4ade80"/><rect x="25" y="19" width="4" height="12" rx="1.5" fill="#4ade80" opacity="0.35"/><rect x="25" y="13" width="4" height="5.5" rx="1" fill="#4ade80"/><path d="M9 23L15 16L21 20L27 14" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/></svg><div style="line-height:1.1"><span style="font-size:15px;font-weight:800;letter-spacing:-0.3px">AlphaChain</span><br><span style="font-size:9px;letter-spacing:1.8px;color:rgba(255,255,255,0.35);text-transform:uppercase;font-weight:600">Bots</span></div></a><div class="fll"><a href="index.html">Inicio</a><a href="stats.html">Track record</a><a href="charts.html">Charts</a><a href="tools.html">Herramientas</a><a href="precios.html">Precios</a><a href="legal.html">Legal</a><a href="faq.html">FAQ</a></div><span class="fcp">© 2026 AlphaChainBots</span></footer><div style="padding:12px 48px;border-top:1px solid var(--bdr)"><p style="font-size:11px;color:rgba(255,255,255,0.18);max-width:1200px;margin:0 auto">⚠ Aviso de riesgo: El trading de criptomonedas conlleva riesgo sustancial de pérdida. Las señales son informativas y no constituyen asesoramiento financiero.</p></div>
+<script>
+const months=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const vals=[4.2,-1.8,6.1,8.3,3.7,-2.1,9.4,5.8,7.2,11.3,6.9,9.4];
+const bars=document.getElementById('bars');
+const max=Math.max(...vals.map(Math.abs));
+vals.forEach((v,i)=>{
+  const w=document.createElement('div');w.className='bw';
+  const pct=Math.abs(v)/max*100;
+  const col=v>=0?'rgba(34,197,94,0.8)':'rgba(239,68,68,0.8)';
+  const tc=v>=0?'#4ade80':'#f87171';
+  w.innerHTML=`<div class="bv" style="color:${tc}">${v>0?'+':''}${v}%</div><div style="height:${pct}%;background:${col};width:100%;border-radius:3px 3px 0 0;min-height:4px"></div><div class="bl">${months[i]}</div>`;
+  bars.appendChild(w);
+});
+function filter(btn,type){
+  document.querySelectorAll('.fb').forEach(b=>b.classList.remove('on'));btn.classList.add('on');
+  document.querySelectorAll('.sr').forEach(r=>{if(type==='all'){r.style.display='';return;}r.style.display=(r.dataset.t===type||r.dataset.p===type)?'':'none';});
+}
+</script></body></html>
