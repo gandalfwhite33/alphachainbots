@@ -4,6 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AlphaChainBots — AI-Powered Crypto Trading</title>
 <meta name="description" content="AlphaChainBots analiza 500+ indicadores en tiempo real y ejecuta operaciones automáticamente. Sin emociones. Sin interrupciones.">
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -99,7 +100,7 @@ a{text-decoration:none;color:inherit}
 .dc-badge.up-b{background:var(--green-bg);color:var(--green)}
 .dc-badge.dn-b{background:var(--red-bg);color:var(--red)}
 .dc-vol{font-size:11px;color:var(--text-muted)}
-.mini-c{height:180px;margin:0 0 16px;position:relative;overflow:hidden;background:transparent}
+.mini-c{display:block;width:100%;height:320px;min-height:320px;margin:0 0 16px;position:relative;overflow:hidden;background:transparent}
 .signals-mini{display:flex;flex-direction:column;gap:8px}
 /* ── coin rows as individual glass cards ── */
 .sm-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;background:none;border:none;cursor:default}
@@ -351,7 +352,7 @@ footer h5{font-size:10.5px;font-weight:700;letter-spacing:1px;text-transform:upp
         <span class="dc-vol" id="hero-vol">Vol: —</span>
       </div>
       <!-- chart directly on background -->
-      <div class="mini-c"><canvas id="mini-c" style="display:block;width:100%;height:100%"></canvas></div>
+      <div class="mini-c" id="mini-c"></div>
       <!-- glass coin cards -->
       <div class="signals-mini">
         <div class="sm-item">
@@ -690,107 +691,104 @@ window.addEventListener('scroll',()=>{document.getElementById('nav').classList.t
   connect();
 })();
 
-/* MINI CHART */
+/* MINI CHART — TradingView Lightweight Charts v4 · kline_1m */
 (function(){
-  const cv=document.getElementById('mini-c');
-  if(!cv)return;
+  function init(){
+    var container=document.getElementById('mini-c');
+    if(!container)return;
+    if(typeof LightweightCharts==='undefined'){setTimeout(init,100);return;}
 
-  const DPR=Math.min(window.devicePixelRatio||1,3);
-  const VISIBLE=80, MAX=VISIBLE+10;
-  let closed=[],live=null,ctx=null,cW=0,cH=0;
+    /* dimensiones explícitas */
+    container.style.cssText='display:block;width:100%;height:320px;min-height:320px;position:relative;overflow:hidden;background:transparent';
+    var W=container.getBoundingClientRect().width||container.offsetWidth||520;
+    var H=320;
 
-  cv.style.cssText='display:block;margin:0;border:none;padding:0;background:transparent';
-
-  async function seed(){
-    try{
-      const d=await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1s&limit='+(VISIBLE+1)).then(r=>r.json());
-      closed=d.slice(0,-1).map(k=>({o:+k[1],h:+k[2],l:+k[3],c:+k[4],t:+k[0]/1000}));
-      const L=d[d.length-1];
-      live={o:+L[1],h:+L[2],l:+L[3],c:+L[4],t:+L[0]/1000};
-    }catch(e){
-      try{
-        const d=await fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit='+VISIBLE).then(r=>r.json());
-        const now=Date.now()/1000;
-        closed=d.map((k,i)=>({o:+k[1],h:+k[2],l:+k[3],c:+k[4],t:now-(d.length-1-i)*60}));
-      }catch(e2){}
-    }
-  }
-
-  function connect(){
-    try{
-      const ws=new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@kline_1s');
-      ws.onmessage=function(e){
-        try{
-          const k=JSON.parse(e.data).k;
-          live={o:+k.o,h:+k.h,l:+k.l,c:+k.c,t:+k.t/1000};
-          if(k.x){closed.push({...live});if(closed.length>MAX)closed.shift();live=null;}
-        }catch(_){}
-      };
-      ws.onerror=()=>ws.close();
-      ws.onclose=()=>setTimeout(connect,3000);
-    }catch(_){}
-  }
-
-  function snap(v){return(Math.round(v*DPR)+0.5)/DPR;}
-
-  function loop(){
-    const cont=cv.parentElement;
-    const W=cont.offsetWidth;
-    const H=cont.offsetHeight;
-    if(W!==cW||H!==cH){
-      cv.width=Math.round(W*DPR);
-      cv.height=Math.round(H*DPR);
-      cv.style.width=W+'px';
-      cv.style.height=H+'px';
-      cW=W;cH=H;
-      ctx=cv.getContext('2d');
-    }
-    if(!ctx){requestAnimationFrame(loop);return;}
-    ctx.setTransform(DPR,0,0,DPR,0,0);
-    ctx.clearRect(0,0,W,H);
-    const all=[...closed];
-    if(live)all.push(live);
-    if(all.length<2){requestAnimationFrame(loop);return;}
-    const chartTop=H*0.10,chartBot=H*0.90,chartH=chartBot-chartTop;
-    const padX=4;
-    const slotW=(W-padX*2)/VISIBLE;
-    const candleW=Math.max(slotW*0.72,1);
-    const prices=all.flatMap(c=>[c.h,c.l]);
-    const mn=Math.min(...prices),mx=Math.max(...prices),rng=mx-mn||1;
-    const toY=v=>chartBot-((v-mn)/rng)*chartH;
-    const nowSec=Date.now()/1000;
-    ctx.save();
-    ctx.beginPath();ctx.rect(0,0,W,H);ctx.clip();
-    all.forEach(c=>{
-      const xc=(W-padX)-(nowSec-c.t)*slotW;
-      const xl=xc-candleW/2;
-      if(xl+candleW<0||xl>W)return;
-      const isLive=live!==null&&c===live;
-      const bull=c.c>=c.o;
-      const rgb=bull?'0,211,149':'244,79,79';
-      const alpha=isLive?1:0.88;
-      ctx.strokeStyle=`rgba(${rgb},${alpha})`;
-      ctx.lineWidth=1/DPR;
-      ctx.beginPath();ctx.moveTo(snap(xc),toY(c.h));ctx.lineTo(snap(xc),toY(c.l));ctx.stroke();
-      const bT=Math.round(Math.min(toY(c.o),toY(c.c)));
-      const bH2=Math.max(Math.round(Math.abs(toY(c.c)-toY(c.o))),1);
-      const bL=Math.round(xl),bW=Math.max(Math.round(candleW),1);
-      ctx.fillStyle=`rgba(${rgb},${alpha})`;
-      ctx.fillRect(bL,bT,bW,bH2);
-      if(isLive){
-        const p=0.35+0.3*Math.sin(Date.now()/220);
-        ctx.shadowColor=bull?'#00d395':'#f44f4f';
-        ctx.shadowBlur=8*p;
-        ctx.fillStyle=`rgba(${rgb},${0.6+p*0.35})`;
-        ctx.fillRect(bL,bT,bW,bH2);
-        ctx.shadowBlur=0;
-      }
+    var chart=LightweightCharts.createChart(container,{
+      width:W,
+      height:H,
+      layout:{
+        background:{type:'solid',color:'rgba(0,0,0,0)'},
+        textColor:'rgba(255,255,255,0.55)',
+        fontSize:11,
+      },
+      grid:{
+        vertLines:{visible:false},
+        horzLines:{visible:false},
+      },
+      rightPriceScale:{
+        borderVisible:false,
+        scaleMargins:{top:0.08,bottom:0.08},
+      },
+      timeScale:{
+        borderVisible:false,
+        timeVisible:true,
+        secondsVisible:false,
+        barSpacing:9,
+        minBarSpacing:3,
+        rightOffset:4,
+      },
+      crosshair:{
+        mode:1,
+        vertLine:{color:'rgba(255,255,255,0.18)',labelBackgroundColor:'rgba(3,11,24,0.95)'},
+        horzLine:{color:'rgba(255,255,255,0.18)',labelBackgroundColor:'rgba(3,11,24,0.95)'},
+      },
+      handleScroll:false,
+      handleScale:false,
     });
-    ctx.restore();
-    requestAnimationFrame(loop);
+
+    var series=chart.addCandlestickSeries({
+      upColor:'#26a69a',
+      downColor:'#ef5350',
+      borderUpColor:'#26a69a',
+      borderDownColor:'#ef5350',
+      wickUpColor:'#26a69a',
+      wickDownColor:'#ef5350',
+      priceLineVisible:false,
+      lastValueVisible:false,
+    });
+
+    /* resize responsivo */
+    new ResizeObserver(function(entries){
+      var w=entries[0].contentRect.width;
+      if(w>0)chart.resize(w,H);
+    }).observe(container);
+
+    /* carga histórica de 60 velas de 1 minuto → cuerpos visibles */
+    fetch('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=60')
+      .then(function(r){return r.json();})
+      .then(function(d){
+        series.setData(d.map(function(k){
+          return{time:Math.floor(+k[0]/1000),open:+k[1],high:+k[2],low:+k[3],close:+k[4]};
+        }));
+        chart.timeScale().scrollToRealTime();
+        connectWS();
+      })
+      .catch(function(){connectWS();});
+
+    /* WebSocket kline_1m: actualiza la vela actual en tiempo real */
+    function connectWS(){
+      try{
+        var ws=new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@kline_1m');
+        ws.onmessage=function(e){
+          try{
+            var k=JSON.parse(e.data).k;
+            series.update({
+              time:Math.floor(+k.t/1000),
+              open:+k.o,high:+k.h,low:+k.l,close:+k.c
+            });
+          }catch(_){}
+        };
+        ws.onerror=function(){ws.close();};
+        ws.onclose=function(){setTimeout(connectWS,3000);};
+      }catch(_){}
+    }
   }
 
-  seed().then(()=>{connect();loop();});
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',init);
+  }else{
+    init();
+  }
 })();
 </script>
 </body>
