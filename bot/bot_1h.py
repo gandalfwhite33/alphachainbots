@@ -13,15 +13,14 @@ Diferencias vs bot.py: INTERVAL=1h | TRAILING_PCT=1% | ciclo cada 1h
 import os
 import time
 import logging
+import requests
 from typing import Optional
 from datetime import datetime
 
 import pandas as pd
 from dotenv import load_dotenv
 from eth_account import Account
-from hyperliquid.info import Info
 from hyperliquid.exchange import Exchange
-from hyperliquid.utils import constants
 
 # ─── LOGGING ─────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -37,6 +36,9 @@ load_dotenv()
 TESTNET         = os.getenv("TESTNET", "true").lower() == "true"
 PRIVATE_KEY     = os.getenv("PRIVATE_KEY", "")
 ACCOUNT_ADDRESS = os.getenv("ACCOUNT_ADDRESS", "")
+
+MAINNET_URL = "https://api.hyperliquid.xyz"
+TESTNET_URL = "https://api.hyperliquid-testnet.xyz"
 
 # Estrategia
 INTERVAL        = "1h"
@@ -65,27 +67,58 @@ INTERVAL_MS = {
     "1h":  3_600_000, "4h": 14_400_000, "1d": 86_400_000,
 }
 
+FALLBACK_COINS = ["BTC","ETH","SOL","HYPE","TAO","XRP","DOGE","AVAX","BNB","LINK"]
+
+
+# ─── API REST DIRECTA (sin SDK) ───────────────────────────────────────────────
+class HLInfo:
+    """Cliente REST minimalista para la API pública de Hyperliquid."""
+
+    def __init__(self, base_url: str):
+        self.url = base_url.rstrip("/") + "/info"
+
+    def _post(self, payload: dict):
+        r = requests.post(self.url, json=payload, timeout=15)
+        r.raise_for_status()
+        return r.json()
+
+    def meta_and_asset_ctxs(self):
+        data = self._post({"type": "metaAndAssetCtxs"})
+        return data[0], data[1]
+
+    def candles_snapshot(self, coin: str, interval: str,
+                         start_ms: int, end_ms: int) -> list:
+        return self._post({
+            "type": "candleSnapshot",
+            "req": {
+                "coin": coin,
+                "interval": interval,
+                "startTime": start_ms,
+                "endTime": end_ms,
+            },
+        })
+
+    def user_state(self, address: str) -> dict:
+        return self._post({"type": "clearinghouseState", "user": address})
+
 
 # ─── CONEXIÓN ─────────────────────────────────────────────────────────────────
-def setup_client() -> tuple[Info, Exchange, str]:
+def setup_client() -> tuple:
     if not PRIVATE_KEY:
         raise ValueError("PRIVATE_KEY no configurada en .env")
-    # Normalizar clave: quitar prefijo 0x y espacios
-    key = PRIVATE_KEY.strip().removeprefix("0x").removeprefix("0X")
-    account = Account.from_key(key)
-    address = ACCOUNT_ADDRESS or account.address
-    api_url = constants.TESTNET_API_URL if TESTNET else constants.MAINNET_API_URL
-    info     = Info(api_url, skip_ws=True)
+    key      = PRIVATE_KEY.strip().removeprefix("0x").removeprefix("0X")
+    account  = Account.from_key(key)
+    address  = ACCOUNT_ADDRESS or account.address
+    api_url  = TESTNET_URL if TESTNET else MAINNET_URL
+    info     = HLInfo(api_url)
     exchange = Exchange(account, api_url, account_address=address)
-    mode = "TESTNET ⚠️ " if TESTNET else "MAINNET 🔴"
+    mode = "TESTNET" if TESTNET else "MAINNET"
     log.info(f"Conectado a Hyperliquid {mode} | Wallet: {address}")
     return info, exchange, address
 
 
 # ─── DATOS DE MERCADO ─────────────────────────────────────────────────────────
-FALLBACK_COINS = ["BTC","ETH","SOL","HYPE","TAO","XRP","DOGE","AVAX","BNB","LINK"]
-
-def get_top_coins(info: Info, n: int = TOP_N_COINS) -> list[str]:
+def get_top_coins(info: HLInfo, n: int = TOP_N_COINS) -> list:
     try:
         meta, ctxs = info.meta_and_asset_ctxs()
         coins_data = []
@@ -102,11 +135,12 @@ def get_top_coins(info: Info, n: int = TOP_N_COINS) -> list[str]:
             log.info(f"Top {n} coins por volumen: {top}")
             return top
     except Exception as e:
-        log.warning(f"meta_and_asset_ctxs() error: {e}. Usando fallback.")
+        log.warning(f"get_top_coins error: {e}. Usando fallback.")
     return FALLBACK_COINS[:n]
 
 
-def fetch_candles(info: Info, coin: str, interval: str = INTERVAL, limit: int = CANDLE_LIMIT) -> pd.DataFrame:
+def fetch_candles(info: HLInfo, coin: str, interval: str = INTERVAL,
+                  limit: int = CANDLE_LIMIT) -> pd.DataFrame:
     end_ms   = int(time.time() * 1000)
     ms       = INTERVAL_MS.get(interval, INTERVAL_MS["1h"])
     start_ms = end_ms - limit * ms
@@ -153,10 +187,6 @@ def detect_crossover(df: pd.DataFrame) -> Optional[str]:
 
 # ─── CONDICIONES DE SALIDA ────────────────────────────────────────────────────
 def ema_reversal_exit(df: pd.DataFrame, direction: str) -> bool:
-    """
-    True si la EMA rápida cruza contra la dirección de la posición.
-    LONG → cruce bajista  |  SHORT → cruce alcista
-    """
     if len(df) < 3:
         return False
     prev2, prev = df.iloc[-3], df.iloc[-2]
@@ -167,13 +197,8 @@ def ema_reversal_exit(df: pd.DataFrame, direction: str) -> bool:
 
 
 def sr_breakout_exit(price: float, direction: str,
-                     highs: list[float], lows: list[float],
+                     highs: list, lows: list,
                      pct: float = SR_BREAK_PCT) -> bool:
-    """
-    True si el precio rompe un S/R relevante en contra de la posición.
-    LONG → cierre si precio cae pct% por debajo de un soporte.
-    SHORT → cierre si precio sube pct% por encima de una resistencia.
-    """
     if direction == "long":
         return any(price < lvl * (1 - pct) for lvl in lows)
     else:
@@ -181,7 +206,6 @@ def sr_breakout_exit(price: float, direction: str,
 
 
 def rsi_extreme_exit(rsi_val: float, direction: str) -> bool:
-    """True si el RSI alcanza zona extrema contraria a la posición."""
     if direction == "long"  and rsi_val > RSI_OB:
         return True
     if direction == "short" and rsi_val < RSI_OS:
@@ -194,28 +218,20 @@ def check_exit_conditions(
     current_price: float,
     direction: str,
     ts: "TrailingStop",
-) -> tuple[bool, str]:
-    """
-    Evalúa las 4 condiciones de salida en orden de prioridad.
-    Devuelve (debe_cerrar, razón).
-    """
-    # 1) Trailing stop
+) -> tuple:
     ts.update(current_price)
     if ts.triggered(current_price):
         return True, f"Trailing Stop tocado | precio={current_price:.2f} stop={ts.stop:.2f}"
 
-    # 2) Cruce EMA inverso
     if ema_reversal_exit(df, direction):
         return True, "Cruce EMA inverso — reversión de tendencia"
 
-    # 3) RSI extremo
     rsi_val = float(df["rsi"].iloc[-2])
     if rsi_extreme_exit(rsi_val, direction):
         lbl = f"sobrecompra RSI={rsi_val:.1f} > {RSI_OB}" if direction == "long" \
               else f"sobreventa RSI={rsi_val:.1f} < {RSI_OS}"
         return True, f"RSI extremo — {lbl}"
 
-    # 4) Ruptura de S/R en contra
     highs, lows = find_pivots(df)
     if sr_breakout_exit(current_price, direction, highs, lows):
         return True, f"Ruptura de S/R en contra | precio={current_price:.2f}"
@@ -224,7 +240,7 @@ def check_exit_conditions(
 
 
 # ─── SOPORTE / RESISTENCIA ────────────────────────────────────────────────────
-def find_pivots(df: pd.DataFrame, window: int = SR_WINDOW) -> tuple[list[float], list[float]]:
+def find_pivots(df: pd.DataFrame, window: int = SR_WINDOW) -> tuple:
     data = df.tail(SR_LOOKBACK).reset_index(drop=True)
     highs, lows = [], []
     for i in range(window, len(data) - window):
@@ -235,22 +251,22 @@ def find_pivots(df: pd.DataFrame, window: int = SR_WINDOW) -> tuple[list[float],
     return highs, lows
 
 
-def near_sr(price: float, highs: list[float], lows: list[float], pct: float = 0.01) -> bool:
+def near_sr(price: float, highs: list, lows: list, pct: float = 0.01) -> bool:
     return any(abs(price - lvl) / lvl <= pct for lvl in highs + lows)
 
 
 # ─── FIBONACCI ────────────────────────────────────────────────────────────────
-def calc_fibonacci(df: pd.DataFrame) -> dict[float, float]:
+def calc_fibonacci(df: pd.DataFrame) -> dict:
     recent = df.tail(SR_LOOKBACK)
     sh, sl = float(recent["high"].max()), float(recent["low"].min())
     rng    = sh - sl
     return {lvl: sh - lvl * rng for lvl in FIBO_LEVELS}
 
 
-def near_fibo_confirm(price: float, fib: dict[float, float]) -> bool:
+def near_fibo_confirm(price: float, fib: dict) -> bool:
     for lvl, lvl_price in fib.items():
         if lvl in FIBO_CONFIRM and abs(price - lvl_price) / lvl_price <= FIBO_ZONE_PCT:
-            log.info(f"  ✓ Fib {lvl:.3f} = {lvl_price:.2f}")
+            log.info(f"  Fib {lvl:.3f} = {lvl_price:.2f}")
             return True
     return False
 
@@ -262,7 +278,7 @@ def volume_confirms(df: pd.DataFrame, lookback: int = 20) -> bool:
     avg_vol  = df["volume"].iloc[-(lookback + 1):-1].mean()
     last_vol = df["volume"].iloc[-2]
     ratio    = last_vol / avg_vol if avg_vol > 0 else 0
-    log.info(f"  Volume ratio: {ratio:.2f}x (mínimo {MIN_VOL_RATIO}x)")
+    log.info(f"  Volume ratio: {ratio:.2f}x (minimo {MIN_VOL_RATIO}x)")
     return ratio >= MIN_VOL_RATIO
 
 
@@ -304,7 +320,8 @@ def set_leverage(exchange: Exchange, coin: str) -> None:
         log.warning(f"  No se pudo fijar leverage para {coin}: {e}")
 
 
-def open_order(exchange: Exchange, coin: str, direction: str, size: float, price: float) -> dict:
+def open_order(exchange: Exchange, coin: str, direction: str,
+               size: float, price: float) -> dict:
     is_buy   = direction == "long"
     slip     = 0.0015
     limit_px = round(price * (1 + slip) if is_buy else price * (1 - slip), 2)
@@ -315,7 +332,8 @@ def open_order(exchange: Exchange, coin: str, direction: str, size: float, price
     return result
 
 
-def close_order(exchange: Exchange, coin: str, direction: str, size: float, price: float) -> dict:
+def close_order(exchange: Exchange, coin: str, direction: str,
+                size: float, price: float) -> dict:
     is_buy   = direction == "short"
     slip     = 0.002
     limit_px = round(price * (1 + slip) if is_buy else price * (1 - slip), 2)
@@ -326,12 +344,12 @@ def close_order(exchange: Exchange, coin: str, direction: str, size: float, pric
 
 
 # ─── ESTADO DE CUENTA ─────────────────────────────────────────────────────────
-def get_equity(info: Info, address: str) -> float:
+def get_equity(info: HLInfo, address: str) -> float:
     state = info.user_state(address)
     return float(state.get("marginSummary", {}).get("accountValue", 0))
 
 
-def get_open_position(info: Info, address: str, coin: str) -> Optional[dict]:
+def get_open_position(info: HLInfo, address: str, coin: str) -> Optional[dict]:
     state = info.user_state(address)
     for pos in state.get("assetPositions", []):
         p = pos.get("position", {})
@@ -344,11 +362,9 @@ def get_open_position(info: Info, address: str, coin: str) -> Optional[dict]:
 class Bot:
     def __init__(self):
         self.info, self.exchange, self.address = setup_client()
-        self.coins: list[str] = []
-        # coin → {direction, size, entry, trailing_stop}
-        self.positions: dict[str, dict] = {}
+        self.coins: list = []
+        self.positions: dict = {}
 
-    # ── gestión de posiciones abiertas ───────────────────────────────────────
     def manage_positions(self) -> None:
         for coin in list(self.positions.keys()):
             try:
@@ -360,7 +376,7 @@ class Bot:
                 df["rsi"]       = calc_rsi(df)
                 current_price   = float(df["close"].iloc[-1])
                 pos_data        = self.positions[coin]
-                ts: TrailingStop = pos_data["trailing_stop"]
+                ts              = pos_data["trailing_stop"]
                 entry           = pos_data["entry"]
                 direction       = pos_data["direction"]
                 pnl_pct         = ((current_price - entry) / entry * 100
@@ -381,13 +397,12 @@ class Bot:
                     if pos:
                         close_order(self.exchange, coin, direction,
                                     float(pos["szi"]), current_price)
-                    log.info(f"[{coin}] 🔴 CIERRE — {reason}")
+                    log.info(f"[{coin}] CIERRE — {reason}")
                     del self.positions[coin]
 
             except Exception as e:
                 log.error(f"[{coin}] Error gestionando posición: {e}")
 
-    # ── búsqueda de nuevas entradas ──────────────────────────────────────────
     def scan_entries(self) -> None:
         equity = get_equity(self.info, self.address)
         if equity <= 0:
@@ -409,31 +424,27 @@ class Bot:
                     continue
 
                 price = float(df["close"].iloc[-2])
-                log.info(f"\n[{coin}] ─── Señal EMA: {signal.upper()} @ {price:.2f} ───")
+                log.info(f"\n[{coin}] Señal EMA: {signal.upper()} @ {price:.2f}")
 
-                # Confirmación 1: S/R
                 highs, lows = find_pivots(df)
                 if not near_sr(price, highs, lows):
-                    log.info(f"[{coin}] ✗ No cerca de S/R → descartado"); continue
-                log.info(f"[{coin}] ✓ S/R confirmado")
+                    log.info(f"[{coin}] No cerca de S/R -> descartado"); continue
+                log.info(f"[{coin}] S/R confirmado")
 
-                # Confirmación 2: Fibonacci
                 fib = calc_fibonacci(df)
                 if not near_fibo_confirm(price, fib):
-                    log.info(f"[{coin}] ✗ Fib 0.5/0.618 no coincide → descartado"); continue
-                log.info(f"[{coin}] ✓ Fibonacci confirmado")
+                    log.info(f"[{coin}] Fib 0.5/0.618 no coincide -> descartado"); continue
+                log.info(f"[{coin}] Fibonacci confirmado")
 
-                # Confirmación 3: Volumen
                 if not volume_confirms(df):
-                    log.info(f"[{coin}] ✗ Volumen insuficiente → descartado"); continue
-                log.info(f"[{coin}] ✓ Volumen confirmado")
+                    log.info(f"[{coin}] Volumen insuficiente -> descartado"); continue
+                log.info(f"[{coin}] Volumen confirmado")
 
-                # Abrir posición
                 size = calc_size(equity, price)
                 if size <= 0:
-                    log.warning(f"[{coin}] Tamaño = 0 → saltando"); continue
+                    log.warning(f"[{coin}] Tamaño = 0 -> saltando"); continue
 
-                log.info(f"[{coin}] 🟢 ENTRADA {signal.upper()} | size={size} | px={price:.2f}")
+                log.info(f"[{coin}] ENTRADA {signal.upper()} | size={size} | px={price:.2f}")
                 open_order(self.exchange, coin, signal, size, price)
                 self.positions[coin] = {
                     "direction":     signal,
@@ -445,7 +456,6 @@ class Bot:
             except Exception as e:
                 log.error(f"[{coin}] Error en escaneo: {e}")
 
-    # ── loop principal ────────────────────────────────────────────────────────
     def run(self) -> None:
         log.info("=" * 60)
         log.info(f" AlphaChainBots 1H — {'TESTNET' if TESTNET else 'MAINNET'}")
@@ -458,9 +468,9 @@ class Bot:
 
         while True:
             try:
-                log.info(f"\n{'═'*50}")
+                log.info(f"\n{'='*50}")
                 log.info(f" Ciclo 1H: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-                log.info(f"{'═'*50}")
+                log.info(f"{'='*50}")
                 self.manage_positions()
                 self.scan_entries()
                 abiertas = list(self.positions.keys())

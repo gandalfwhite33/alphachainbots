@@ -28,9 +28,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
+import requests
 import pandas as pd
-from hyperliquid.info import Info
-from hyperliquid.utils import constants
 
 # ─── ANSI ─────────────────────────────────────────────────────────────────────
 RST  = "\033[0m"
@@ -118,35 +117,45 @@ _dash_lock  = threading.Lock()
 stop_event  = threading.Event()
 
 
-# ─── API PÚBLICA (MAINNET, SIN AUTH) ─────────────────────────────────────────
-_info = Info(constants.MAINNET_API_URL, skip_ws=True)
+# ─── API REST DIRECTA (MAINNET, SIN AUTH) ────────────────────────────────────
+_HL_URL = "https://api.hyperliquid.xyz/info"
+
+def _hl_post(payload: dict):
+    r = requests.post(_HL_URL, json=payload, timeout=15)
+    r.raise_for_status()
+    return r.json()
 
 FALLBACK_COINS = ["BTC","ETH","SOL","HYPE","TAO","XRP","DOGE","AVAX","BNB","LINK"]
 
-def get_top_coins(n: int = TOP_N_COINS) -> list[str]:
+def get_top_coins(n: int = TOP_N_COINS) -> list:
     try:
-        meta, ctxs = _info.meta_and_asset_ctxs()
-        data = []
+        data = _hl_post({"type": "metaAndAssetCtxs"})
+        meta, ctxs = data[0], data[1]
+        coins_data = []
         for i, asset in enumerate(meta["universe"]):
             if i < len(ctxs):
                 try:
                     vol = float(ctxs[i].get("dayNtlVlm", 0))
                 except (TypeError, ValueError):
                     vol = 0
-                data.append({"coin": asset["name"], "vol": vol})
-        data.sort(key=lambda x: x["vol"], reverse=True)
-        top = [d["coin"] for d in data[:n]]
+                coins_data.append({"coin": asset["name"], "vol": vol})
+        coins_data.sort(key=lambda x: x["vol"], reverse=True)
+        top = [d["coin"] for d in coins_data[:n]]
         if top:
             return top
     except Exception as e:
-        print(f"[WARN] meta_and_asset_ctxs() error: {e}. Usando fallback.")
+        print(f"[WARN] get_top_coins error: {e}. Usando fallback.")
     return FALLBACK_COINS[:n]
 
 def fetch_candles(coin: str, interval: str, limit: int) -> pd.DataFrame:
     end_ms   = int(time.time() * 1000)
     ms       = INTERVAL_MS.get(interval, INTERVAL_MS["1h"])
     start_ms = end_ms - limit * ms
-    raw = _info.candles_snapshot(coin, interval, start_ms, end_ms)
+    raw = _hl_post({
+        "type": "candleSnapshot",
+        "req": {"coin": coin, "interval": interval,
+                "startTime": start_ms, "endTime": end_ms},
+    })
     if not raw:
         return pd.DataFrame()
     df = pd.DataFrame(raw).rename(columns={
