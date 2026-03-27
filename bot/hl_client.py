@@ -10,14 +10,31 @@ Dependencias: requests, eth-account, eth-utils, msgpack
 import time
 import msgpack
 import requests
-from eth_account.structured_data import encode_typed_data
+from eth_account import Account
+from eth_account.messages import SignableMessage
 from eth_utils import keccak
 
 MAINNET_URL = "https://api.hyperliquid.xyz"
 TESTNET_URL = "https://api.hyperliquid-testnet.xyz"
 
-_ZERO_ADDR = "0x0000000000000000000000000000000000000000"
-_MAX_DEC   = 6   # decimales máximos para precios y tamaños
+_MAX_DEC = 6   # decimales máximos para precios y tamaños
+
+# ─── EIP-712: hashes constantes pre-calculados ────────────────────────────────
+# keccak256 de las type strings (nunca cambian)
+_DOMAIN_TYPEHASH = keccak(primitive=(
+    b"EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+))
+_AGENT_TYPEHASH = keccak(primitive=b"Agent(string source,bytes32 connectionId)")
+
+# Domain separator de Hyperliquid: chainId=1337, verifyingContract=0x000...0
+# keccak256(domainTypeHash + keccak(name) + keccak(version) + chainId + address)
+_DOMAIN_SEP = keccak(primitive=(
+    _DOMAIN_TYPEHASH
+    + keccak(primitive=b"Exchange")   # name  (string → keccak256)
+    + keccak(primitive=b"1")          # version (string → keccak256)
+    + (1337).to_bytes(32, "big")      # chainId (uint256)
+    + bytes(32)                        # verifyingContract = address(0)
+))
 
 
 # ─── HELPERS DE FIRMA ─────────────────────────────────────────────────────────
@@ -31,42 +48,37 @@ def _float_to_wire(x: float) -> str:
     return s.rstrip("0").rstrip(".")
 
 
-def _action_hash(action: dict, nonce: int) -> bytes:
-    """
-    msgpack-serializa el action + 20 bytes vacíos (no vault) + nonce (8 bytes BE)
-    y devuelve keccak256 de esa concatenación.
-    """
-    packed     = msgpack.packb(action, use_bin_type=True)
-    nonce_b    = nonce.to_bytes(8, "big")
-    return keccak(primitive=packed + bytes(20) + nonce_b)
-
-
 def _sign_action(account, action: dict, nonce: int, is_mainnet: bool) -> dict:
     """
-    Firma un L1 action de Hyperliquid siguiendo el esquema EIP-712:
-      Agent { source: string, connectionId: bytes32 }
-    """
-    connection_id = _action_hash(action, nonce)
+    Firma un L1 action de Hyperliquid con EIP-712 sin usar
+    eth_account.structured_data.
 
+    Esquema:  Agent { source: string, connectionId: bytes32 }
+
+    Pasos:
+      1. connectionId = keccak256(msgpack(action) + 20_zero_bytes + nonce_be8)
+      2. structHash   = keccak256(agentTypeHash + keccak(source) + connectionId)
+      3. SignableMessage(version=b'\\x01', header=domainSep, body=structHash)
+         → eth_account internamente calcula keccak256(\\x19\\x01 + header + body)
+         que es exactamente el hash final de EIP-712.
+    """
+    # 1. connectionId
+    packed = msgpack.packb(action, use_bin_type=True)
+    cid    = keccak(primitive=packed + bytes(20) + nonce.to_bytes(8, "big"))
+
+    # 2. struct hash para Agent
+    source      = b"a" if is_mainnet else b"b"
+    struct_hash = keccak(primitive=(
+        _AGENT_TYPEHASH
+        + keccak(primitive=source)  # string → keccak256
+        + bytes(cid)                # bytes32 → directo (ya son 32 bytes)
+    ))
+
+    # 3. Firmar con EIP-191 versión 0x01 (EIP-712)
+    #    sign_message llama internamente a keccak(\x19 + version + header + body)
+    #    = keccak(\x19\x01 + _DOMAIN_SEP + struct_hash)  ← hash final EIP-712
     signed = account.sign_message(
-        encode_typed_data(
-            domain_data={
-                "name":             "Exchange",
-                "version":          "1",
-                "chainId":          1337,
-                "verifyingContract": _ZERO_ADDR,
-            },
-            message_types={
-                "Agent": [
-                    {"name": "source",       "type": "string"},
-                    {"name": "connectionId", "type": "bytes32"},
-                ]
-            },
-            message_data={
-                "source":       "a" if is_mainnet else "b",
-                "connectionId": connection_id,
-            },
-        )
+        SignableMessage(version=b"\x01", header=bytes(_DOMAIN_SEP), body=struct_hash)
     )
     return {"r": hex(signed.r), "s": hex(signed.s), "v": signed.v}
 
