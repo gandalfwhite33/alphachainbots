@@ -1,27 +1,24 @@
 #!/usr/bin/env python3
 """
 AlphaChainBots — Hyperliquid Trading Bot (1H · SMA 50/100)
-Entrada : SMA 50 cruza SMA 100 + S/R ±0.8% + Fibonacci 0.5/0.618 + Volume Profile 1.3x
+Entrada : SMA 50 cruza SMA 100 + S/R ±0.8% + Fibonacci 0.5/0.618 + Volume 1.3x
 Salida  : dinámica — sin TP fijo. Cierra cuando:
-            1) SMA rápida cruza contra la posición  (reversión de tendencia)
+            1) SMA rápida cruza contra la posición
             2) Precio rompe S/R relevante en contra
             3) RSI > 75 (long) o RSI < 25 (short)
             4) Trailing stop 1.0% es tocado
-Diferencias vs bot_1h.py: SMA en vez de EMA | MA50/100 en vez de MA20/50
-                           S/R ±0.8% | Volume 1.3x
 """
 
 import os
 import time
 import logging
-import requests
 from typing import Optional
 from datetime import datetime
 
 import pandas as pd
 from dotenv import load_dotenv
 from eth_account import Account
-from hyperliquid.exchange import Exchange
+from hl_client import HLInfo, HLExchange, MAINNET_URL, TESTNET_URL
 
 # ─── LOGGING ─────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -38,70 +35,34 @@ TESTNET         = os.getenv("TESTNET", "true").lower() == "true"
 PRIVATE_KEY     = os.getenv("PRIVATE_KEY", "")
 ACCOUNT_ADDRESS = os.getenv("ACCOUNT_ADDRESS", "")
 
-MAINNET_URL = "https://api.hyperliquid.xyz"
-TESTNET_URL = "https://api.hyperliquid-testnet.xyz"
-
-# Estrategia
 INTERVAL        = "1h"
-MA_FAST         = 50          # SMA rápida
-MA_SLOW         = 100         # SMA lenta
+MA_FAST         = 50
+MA_SLOW         = 100
 RSI_PERIOD      = 14
-RSI_OB          = 75          # RSI sobrecompra → salida long
-RSI_OS          = 25          # RSI sobreventa  → salida short
-CANDLE_LIMIT    = 300         # Más velas para cubrir SMA 100 + margen
+RSI_OB          = 75
+RSI_OS          = 25
+CANDLE_LIMIT    = 300
 TOP_N_COINS     = 10
 LEVERAGE        = 3
-RISK_PER_TRADE  = 0.02        # 2% equity por operación
-TRAILING_PCT    = 0.010       # 1.0% trailing stop
-MIN_VOL_RATIO   = 1.3         # Umbral de volumen más accesible (1.3x)
-FIBO_ZONE_PCT   = 0.012       # ±1.2% zona fib
+RISK_PER_TRADE  = 0.02
+TRAILING_PCT    = 0.010
+MIN_VOL_RATIO   = 1.3
+FIBO_ZONE_PCT   = 0.012
 SR_LOOKBACK     = 60
 SR_WINDOW       = 4
-SR_NEAR_PCT     = 0.008       # ±0.8% para confirmar proximidad S/R
-SR_BREAK_PCT    = 0.004       # 0.4% margen ruptura S/R
-LOOP_SLEEP      = 60 * 60     # Ciclo cada 1 hora
+SR_NEAR_PCT     = 0.008
+SR_BREAK_PCT    = 0.004
+LOOP_SLEEP      = 60 * 60
 
-FIBO_LEVELS     = [0.236, 0.382, 0.500, 0.618, 0.786]
-FIBO_CONFIRM    = {0.500, 0.618}
+FIBO_LEVELS  = [0.236, 0.382, 0.500, 0.618, 0.786]
+FIBO_CONFIRM = {0.500, 0.618}
 
 INTERVAL_MS = {
-    "1m":  60_000, "5m": 300_000, "15m": 900_000,
-    "1h":  3_600_000, "4h": 14_400_000, "1d": 86_400_000,
+    "1m": 60_000, "5m": 300_000, "15m": 900_000,
+    "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000,
 }
 
 FALLBACK_COINS = ["BTC","ETH","SOL","HYPE","TAO","XRP","DOGE","AVAX","BNB","LINK"]
-
-
-# ─── API REST DIRECTA (sin SDK) ───────────────────────────────────────────────
-class HLInfo:
-    """Cliente REST minimalista para la API pública de Hyperliquid."""
-
-    def __init__(self, base_url: str):
-        self.url = base_url.rstrip("/") + "/info"
-
-    def _post(self, payload: dict):
-        r = requests.post(self.url, json=payload, timeout=15)
-        r.raise_for_status()
-        return r.json()
-
-    def meta_and_asset_ctxs(self):
-        data = self._post({"type": "metaAndAssetCtxs"})
-        return data[0], data[1]
-
-    def candles_snapshot(self, coin: str, interval: str,
-                         start_ms: int, end_ms: int) -> list:
-        return self._post({
-            "type": "candleSnapshot",
-            "req": {
-                "coin": coin,
-                "interval": interval,
-                "startTime": start_ms,
-                "endTime": end_ms,
-            },
-        })
-
-    def user_state(self, address: str) -> dict:
-        return self._post({"type": "clearinghouseState", "user": address})
 
 
 # ─── CONEXIÓN ─────────────────────────────────────────────────────────────────
@@ -113,7 +74,7 @@ def setup_client() -> tuple:
     address  = ACCOUNT_ADDRESS or account.address
     api_url  = TESTNET_URL if TESTNET else MAINNET_URL
     info     = HLInfo(api_url)
-    exchange = Exchange(account, api_url, account_address=address)
+    exchange = HLExchange(account, api_url, account_address=address)
     mode = "TESTNET" if TESTNET else "MAINNET"
     log.info(f"Conectado a Hyperliquid {mode} | Wallet: {address}")
     return info, exchange, address
@@ -149,9 +110,10 @@ def fetch_candles(info: HLInfo, coin: str, interval: str = INTERVAL,
     raw = info.candles_snapshot(coin, interval, start_ms, end_ms)
     if not raw:
         return pd.DataFrame()
-    df = pd.DataFrame(raw)
-    df = df.rename(columns={"t": "time", "o": "open", "h": "high",
-                             "l": "low",  "c": "close", "v": "volume"})
+    df = pd.DataFrame(raw).rename(columns={
+        "t": "time", "o": "open", "h": "high", "l": "low",
+        "c": "close", "v": "volume",
+    })
     for col in ["open", "high", "low", "close", "volume"]:
         df[col] = df[col].astype(float)
     df["time"] = pd.to_datetime(df["time"], unit="ms")
@@ -160,7 +122,6 @@ def fetch_candles(info: HLInfo, coin: str, interval: str = INTERVAL,
 
 # ─── INDICADORES ──────────────────────────────────────────────────────────────
 def add_smas(df: pd.DataFrame) -> pd.DataFrame:
-    """Medias móviles SIMPLES (SMA), no exponenciales."""
     df["ma_fast"] = df["close"].rolling(window=MA_FAST).mean()
     df["ma_slow"] = df["close"].rolling(window=MA_SLOW).mean()
     return df
@@ -177,23 +138,13 @@ def calc_rsi(df: pd.DataFrame, period: int = RSI_PERIOD) -> pd.Series:
 
 
 def detect_crossover(df: pd.DataFrame) -> Optional[str]:
-    """
-    Cruce de SMA para entradas — compara las dos últimas velas cerradas.
-    Devuelve 'long', 'short' o None.
-    """
     valid = df.dropna(subset=["ma_fast", "ma_slow"])
     if len(valid) < 3:
         return None
-
-    prev2 = valid.iloc[-3]
-    prev  = valid.iloc[-2]
-
-    bullish = prev2["ma_fast"] <= prev2["ma_slow"] and prev["ma_fast"] > prev["ma_slow"]
-    bearish = prev2["ma_fast"] >= prev2["ma_slow"] and prev["ma_fast"] < prev["ma_slow"]
-
-    if bullish:
+    prev2, prev = valid.iloc[-3], valid.iloc[-2]
+    if prev2["ma_fast"] <= prev2["ma_slow"] and prev["ma_fast"] > prev["ma_slow"]:
         return "long"
-    if bearish:
+    if prev2["ma_fast"] >= prev2["ma_slow"] and prev["ma_fast"] < prev["ma_slow"]:
         return "short"
     return None
 
@@ -206,50 +157,34 @@ def ma_reversal_exit(df: pd.DataFrame, direction: str) -> bool:
     prev2, prev = valid.iloc[-3], valid.iloc[-2]
     if direction == "long":
         return prev2["ma_fast"] >= prev2["ma_slow"] and prev["ma_fast"] < prev["ma_slow"]
-    else:
-        return prev2["ma_fast"] <= prev2["ma_slow"] and prev["ma_fast"] > prev["ma_slow"]
+    return prev2["ma_fast"] <= prev2["ma_slow"] and prev["ma_fast"] > prev["ma_slow"]
 
 
 def sr_breakout_exit(price: float, direction: str,
-                     highs: list, lows: list,
-                     pct: float = SR_BREAK_PCT) -> bool:
+                     highs: list, lows: list, pct: float = SR_BREAK_PCT) -> bool:
     if direction == "long":
         return any(price < lvl * (1 - pct) for lvl in lows)
-    else:
-        return any(price > lvl * (1 + pct) for lvl in highs)
+    return any(price > lvl * (1 + pct) for lvl in highs)
 
 
 def rsi_extreme_exit(rsi_val: float, direction: str) -> bool:
-    if direction == "long"  and rsi_val > RSI_OB:
-        return True
-    if direction == "short" and rsi_val < RSI_OS:
-        return True
+    if direction == "long"  and rsi_val > RSI_OB: return True
+    if direction == "short" and rsi_val < RSI_OS: return True
     return False
 
 
-def check_exit_conditions(
-    df: pd.DataFrame,
-    current_price: float,
-    direction: str,
-    ts: "TrailingStop",
-) -> tuple:
+def check_exit_conditions(df, current_price, direction, ts) -> tuple:
     ts.update(current_price)
     if ts.triggered(current_price):
-        return True, f"Trailing Stop tocado | precio={current_price:.2f} stop={ts.stop:.2f}"
-
+        return True, f"Trailing Stop | precio={current_price:.2f} stop={ts.stop:.2f}"
     if ma_reversal_exit(df, direction):
-        return True, "Cruce SMA inverso — reversión de tendencia"
-
+        return True, "Cruce SMA inverso"
     rsi_val = float(df["rsi"].iloc[-2])
     if rsi_extreme_exit(rsi_val, direction):
-        lbl = f"sobrecompra RSI={rsi_val:.1f} > {RSI_OB}" if direction == "long" \
-              else f"sobreventa RSI={rsi_val:.1f} < {RSI_OS}"
-        return True, f"RSI extremo — {lbl}"
-
+        return True, f"RSI extremo {rsi_val:.1f}"
     highs, lows = find_pivots(df)
     if sr_breakout_exit(current_price, direction, highs, lows):
-        return True, f"Ruptura de S/R en contra | precio={current_price:.2f}"
-
+        return True, f"Ruptura S/R | precio={current_price:.2f}"
     return False, ""
 
 
@@ -267,7 +202,6 @@ def find_pivots(df: pd.DataFrame, window: int = SR_WINDOW) -> tuple:
 
 def near_sr(price: float, highs: list, lows: list,
             pct: float = SR_NEAR_PCT) -> bool:
-    """±0.8% para confirmar proximidad a S/R."""
     return any(abs(price - lvl) / lvl <= pct for lvl in highs + lows)
 
 
@@ -275,8 +209,7 @@ def near_sr(price: float, highs: list, lows: list,
 def calc_fibonacci(df: pd.DataFrame) -> dict:
     recent = df.tail(SR_LOOKBACK)
     sh, sl = float(recent["high"].max()), float(recent["low"].min())
-    rng    = sh - sl
-    return {lvl: sh - lvl * rng for lvl in FIBO_LEVELS}
+    return {lvl: sh - lvl * (sh - sl) for lvl in FIBO_LEVELS}
 
 
 def near_fibo_confirm(price: float, fib: dict) -> bool:
@@ -289,55 +222,50 @@ def near_fibo_confirm(price: float, fib: dict) -> bool:
 
 # ─── VOLUME PROFILE ───────────────────────────────────────────────────────────
 def volume_confirms(df: pd.DataFrame, lookback: int = 20) -> bool:
-    """Volumen de la última vela cerrada >= MIN_VOL_RATIO × media (1.3x)."""
     if len(df) < lookback + 2:
         return False
     avg_vol  = df["volume"].iloc[-(lookback + 1):-1].mean()
     last_vol = df["volume"].iloc[-2]
     ratio    = last_vol / avg_vol if avg_vol > 0 else 0
-    log.info(f"  Volume ratio: {ratio:.2f}x (minimo {MIN_VOL_RATIO}x)")
+    log.info(f"  Volume ratio: {ratio:.2f}x (min {MIN_VOL_RATIO}x)")
     return ratio >= MIN_VOL_RATIO
 
 
 # ─── TAMAÑO DE POSICIÓN ───────────────────────────────────────────────────────
 def calc_size(equity: float, price: float) -> float:
-    notional = equity * RISK_PER_TRADE * LEVERAGE
-    return round(notional / price, 4)
+    return round(equity * RISK_PER_TRADE * LEVERAGE / price, 4)
 
 
 # ─── TRAILING STOP ────────────────────────────────────────────────────────────
 class TrailingStop:
     def __init__(self, entry: float, direction: str, pct: float = TRAILING_PCT):
         self.direction = direction
-        self.pct       = pct
-        self.best      = entry
-        self.stop      = entry * (1 - pct) if direction == "long" else entry * (1 + pct)
+        self.pct  = pct
+        self.best = entry
+        self.stop = entry * (1 - pct) if direction == "long" else entry * (1 + pct)
 
     def update(self, price: float) -> None:
         if self.direction == "long" and price > self.best:
-            self.best = price
-            self.stop = self.best * (1 - self.pct)
+            self.best = price; self.stop = self.best * (1 - self.pct)
         elif self.direction == "short" and price < self.best:
-            self.best = price
-            self.stop = self.best * (1 + self.pct)
+            self.best = price; self.stop = self.best * (1 + self.pct)
 
     def triggered(self, price: float) -> bool:
         return price <= self.stop if self.direction == "long" else price >= self.stop
 
     def __str__(self) -> str:
-        return (f"TrailingStop({self.direction} | best={self.best:.2f} "
-                f"stop={self.stop:.2f} dist={self.pct*100:.1f}%)")
+        return f"TS({self.direction} best={self.best:.2f} stop={self.stop:.2f})"
 
 
 # ─── ÓRDENES ──────────────────────────────────────────────────────────────────
-def set_leverage(exchange: Exchange, coin: str) -> None:
+def set_leverage(exchange: HLExchange, coin: str) -> None:
     try:
         exchange.update_leverage(LEVERAGE, coin, is_cross=False)
     except Exception as e:
         log.warning(f"  No se pudo fijar leverage para {coin}: {e}")
 
 
-def open_order(exchange: Exchange, coin: str, direction: str,
+def open_order(exchange: HLExchange, coin: str, direction: str,
                size: float, price: float) -> dict:
     is_buy   = direction == "long"
     slip     = 0.0015
@@ -349,7 +277,7 @@ def open_order(exchange: Exchange, coin: str, direction: str,
     return result
 
 
-def close_order(exchange: Exchange, coin: str, direction: str,
+def close_order(exchange: HLExchange, coin: str, direction: str,
                 size: float, price: float) -> dict:
     is_buy   = direction == "short"
     slip     = 0.002
@@ -379,7 +307,7 @@ def get_open_position(info: HLInfo, address: str, coin: str) -> Optional[dict]:
 class Bot:
     def __init__(self):
         self.info, self.exchange, self.address = setup_client()
-        self.coins: list = []
+        self.coins:     list = []
         self.positions: dict = {}
 
     def manage_positions(self) -> None:
@@ -388,27 +316,19 @@ class Bot:
                 df = fetch_candles(self.info, coin)
                 if df.empty or len(df) < MA_SLOW + 3:
                     continue
-
-                df              = add_smas(df)
-                df["rsi"]       = calc_rsi(df)
-                current_price   = float(df["close"].iloc[-1])
-                pos_data        = self.positions[coin]
-                ts              = pos_data["trailing_stop"]
-                entry           = pos_data["entry"]
-                direction       = pos_data["direction"]
-                pnl_pct         = ((current_price - entry) / entry * 100
-                                   if direction == "long"
-                                   else (entry - current_price) / entry * 100)
-
-                log.info(
-                    f"[{coin}] {direction.upper()} | entrada={entry:.2f} "
-                    f"actual={current_price:.2f} | PnL={pnl_pct:+.2f}% | {ts}"
-                )
-
+                df = add_smas(df); df["rsi"] = calc_rsi(df)
+                current_price = float(df["close"].iloc[-1])
+                pos_data  = self.positions[coin]
+                ts        = pos_data["trailing_stop"]
+                entry     = pos_data["entry"]
+                direction = pos_data["direction"]
+                pnl_pct   = ((current_price - entry) / entry * 100
+                             if direction == "long"
+                             else (entry - current_price) / entry * 100)
+                log.info(f"[{coin}] {direction.upper()} entrada={entry:.2f} "
+                         f"actual={current_price:.2f} PnL={pnl_pct:+.2f}% {ts}")
                 should_close, reason = check_exit_conditions(
-                    df, current_price, direction, ts
-                )
-
+                    df, current_price, direction, ts)
                 if should_close:
                     pos = get_open_position(self.info, self.address, coin)
                     if pos:
@@ -416,7 +336,6 @@ class Bot:
                                     float(pos["szi"]), current_price)
                     log.info(f"[{coin}] CIERRE — {reason}")
                     del self.positions[coin]
-
             except Exception as e:
                 log.error(f"[{coin}] Error gestionando posición: {e}")
 
@@ -425,7 +344,7 @@ class Bot:
         if equity <= 0:
             log.warning("Equity = 0. Verifica que la testnet está financiada.")
             return
-        log.info(f"Equity disponible: ${equity:.2f}")
+        log.info(f"Equity: ${equity:.2f}")
 
         for coin in self.coins:
             if coin in self.positions:
@@ -435,38 +354,27 @@ class Bot:
                 if len(df) < MA_SLOW + 10:
                     log.warning(f"[{coin}] Pocas velas ({len(df)}) — saltando")
                     continue
-
                 df     = add_smas(df)
                 signal = detect_crossover(df)
                 if not signal:
                     continue
-
                 price = float(df["close"].iloc[-2])
                 log.info(f"\n[{coin}] Señal SMA: {signal.upper()} @ {price:.2f}")
 
                 highs, lows = find_pivots(df)
                 if not near_sr(price, highs, lows):
-                    log.info(f"[{coin}] No cerca de S/R (+-{SR_NEAR_PCT*100:.1f}%) -> descartado")
-                    continue
-                log.info(f"[{coin}] S/R confirmado")
-
+                    log.info(f"[{coin}] No cerca de S/R -> descartado"); continue
                 fib = calc_fibonacci(df)
                 if not near_fibo_confirm(price, fib):
-                    log.info(f"[{coin}] Fib 0.5/0.618 no coincide -> descartado")
-                    continue
-                log.info(f"[{coin}] Fibonacci confirmado")
-
+                    log.info(f"[{coin}] Fib no coincide -> descartado"); continue
                 if not volume_confirms(df):
-                    log.info(f"[{coin}] Volumen insuficiente -> descartado")
-                    continue
-                log.info(f"[{coin}] Volumen confirmado")
+                    log.info(f"[{coin}] Volumen insuficiente -> descartado"); continue
 
                 size = calc_size(equity, price)
                 if size <= 0:
-                    log.warning(f"[{coin}] Tamaño = 0 -> saltando")
-                    continue
+                    log.warning(f"[{coin}] Tamaño = 0 -> saltando"); continue
 
-                log.info(f"[{coin}] ENTRADA {signal.upper()} | size={size} | px={price:.2f}")
+                log.info(f"[{coin}] ENTRADA {signal.upper()} size={size} px={price:.2f}")
                 open_order(self.exchange, coin, signal, size, price)
                 self.positions[coin] = {
                     "direction":     signal,
@@ -474,7 +382,6 @@ class Bot:
                     "entry":         price,
                     "trailing_stop": TrailingStop(price, signal),
                 }
-
             except Exception as e:
                 log.error(f"[{coin}] Error en escaneo: {e}")
 
@@ -482,13 +389,10 @@ class Bot:
         log.info("=" * 60)
         log.info(f" AlphaChainBots 1H·SMA — {'TESTNET' if TESTNET else 'MAINNET'}")
         log.info(f" SMA {MA_FAST}/{MA_SLOW} | Trailing {TRAILING_PCT*100:.1f}%"
-                 f" | RSI {RSI_OS}/{RSI_OB} | Leverage {LEVERAGE}x")
+                 f" | RSI {RSI_OS}/{RSI_OB} | {LEVERAGE}x")
         log.info(f" S/R +-{SR_NEAR_PCT*100:.1f}% | Volume >={MIN_VOL_RATIO}x | Fib 0.5/0.618")
-        log.info(" Salida: SMA reversal | S/R breakout | RSI extremo | Trailing stop")
         log.info("=" * 60)
-
         self.coins = get_top_coins(self.info)
-
         while True:
             try:
                 log.info(f"\n{'='*50}")
@@ -496,18 +400,14 @@ class Bot:
                 log.info(f"{'='*50}")
                 self.manage_positions()
                 self.scan_entries()
-                abiertas = list(self.positions.keys())
-                log.info(f"\nPosiciones: {abiertas if abiertas else 'ninguna'}")
+                log.info(f"\nPosiciones: {list(self.positions.keys()) or 'ninguna'}")
                 log.info(f"Próximo ciclo en 1h...\n")
                 time.sleep(LOOP_SLEEP)
             except KeyboardInterrupt:
-                log.info("Bot detenido por el usuario.")
-                break
+                log.info("Bot detenido."); break
             except Exception as e:
-                log.error(f"Error inesperado: {e}")
-                time.sleep(60)
+                log.error(f"Error inesperado: {e}"); time.sleep(60)
 
 
-# ─── ENTRY POINT ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     Bot().run()
