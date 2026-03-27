@@ -121,15 +121,26 @@ stop_event  = threading.Event()
 # ─── API PÚBLICA (MAINNET, SIN AUTH) ─────────────────────────────────────────
 _info = Info(constants.MAINNET_API_URL, skip_ws=True)
 
+FALLBACK_COINS = ["BTC","ETH","SOL","HYPE","TAO","XRP","DOGE","AVAX","BNB","LINK"]
+
 def get_top_coins(n: int = TOP_N_COINS) -> list[str]:
-    meta, ctxs = _info.meta_and_asset_ctxs()
-    data = []
-    for i, asset in enumerate(meta["universe"]):
-        if i < len(ctxs):
-            data.append({"coin": asset["name"],
-                         "vol": float(ctxs[i].get("dayNtlVlm", 0))})
-    data.sort(key=lambda x: x["vol"], reverse=True)
-    return [d["coin"] for d in data[:n]]
+    try:
+        meta, ctxs = _info.meta_and_asset_ctxs()
+        data = []
+        for i, asset in enumerate(meta["universe"]):
+            if i < len(ctxs):
+                try:
+                    vol = float(ctxs[i].get("dayNtlVlm", 0))
+                except (TypeError, ValueError):
+                    vol = 0
+                data.append({"coin": asset["name"], "vol": vol})
+        data.sort(key=lambda x: x["vol"], reverse=True)
+        top = [d["coin"] for d in data[:n]]
+        if top:
+            return top
+    except Exception as e:
+        print(f"[WARN] meta_and_asset_ctxs() error: {e}. Usando fallback.")
+    return FALLBACK_COINS[:n]
 
 def fetch_candles(coin: str, interval: str, limit: int) -> pd.DataFrame:
     end_ms   = int(time.time() * 1000)

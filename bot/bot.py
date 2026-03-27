@@ -82,17 +82,27 @@ def setup_client() -> tuple[Info, Exchange, str]:
 
 
 # ─── DATOS DE MERCADO ─────────────────────────────────────────────────────────
+FALLBACK_COINS = ["BTC","ETH","SOL","HYPE","TAO","XRP","DOGE","AVAX","BNB","LINK"]
+
 def get_top_coins(info: Info, n: int = TOP_N_COINS) -> list[str]:
-    meta, ctxs = info.meta_and_asset_ctxs()
-    coins_data = []
-    for i, asset in enumerate(meta["universe"]):
-        if i < len(ctxs):
-            vol = float(ctxs[i].get("dayNtlVlm", 0))
-            coins_data.append({"coin": asset["name"], "vol": vol})
-    coins_data.sort(key=lambda x: x["vol"], reverse=True)
-    top = [c["coin"] for c in coins_data[:n]]
-    log.info(f"Top {n} coins por volumen: {top}")
-    return top
+    try:
+        meta, ctxs = info.meta_and_asset_ctxs()
+        coins_data = []
+        for i, asset in enumerate(meta["universe"]):
+            if i < len(ctxs):
+                try:
+                    vol = float(ctxs[i].get("dayNtlVlm", 0))
+                except (TypeError, ValueError):
+                    vol = 0
+                coins_data.append({"coin": asset["name"], "vol": vol})
+        coins_data.sort(key=lambda x: x["vol"], reverse=True)
+        top = [c["coin"] for c in coins_data[:n]]
+        if top:
+            log.info(f"Top {n} coins por volumen: {top}")
+            return top
+    except Exception as e:
+        log.warning(f"meta_and_asset_ctxs() error: {e}. Usando fallback.")
+    return FALLBACK_COINS[:n]
 
 
 def fetch_candles(info: Info, coin: str, interval: str = INTERVAL, limit: int = CANDLE_LIMIT) -> pd.DataFrame:
