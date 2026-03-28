@@ -52,11 +52,16 @@ a{color:inherit;text-decoration:none}
 .card.c6{border-left-color:#4dd0e1}.card.c7{border-left-color:#a5d6a7}
 .card.c8{border-left-color:#f48fb1}.card.c9{border-left-color:#80cbc4}
 .card.c10{border-left-color:#bcaaa4}.card.c11{border-left-color:#b0bec5}
+.card.c12{border-left-color:#e6ee9c}.card.c13{border-left-color:#ffcc02}
+.card.c14{border-left-color:#80deea}.card.c15{border-left-color:#ef9a9a}
+.card.c16{border-left-color:#c5e1a5}.card.c17{border-left-color:#b39ddb}
 .card-name{font-size:13px;font-weight:bold;letter-spacing:1px;margin-bottom:6px}
 .col0{color:#4fc3f7}.col1{color:#ffd740}.col2{color:#69f0ae}
 .col3{color:#ff6b6b}.col4{color:#ce93d8}.col5{color:#ffab40}
 .col6{color:#4dd0e1}.col7{color:#a5d6a7}.col8{color:#f48fb1}
 .col9{color:#80cbc4}.col10{color:#bcaaa4}.col11{color:#b0bec5}
+.col12{color:#e6ee9c}.col13{color:#ffcc02}.col14{color:#80deea}
+.col15{color:#ef9a9a}.col16{color:#c5e1a5}.col17{color:#b39ddb}
 .card-meta{color:#37505f;font-size:11px;margin-bottom:8px}
 .card-eq{font-size:15px;font-weight:bold;margin-bottom:3px;color:#c9d4e0}
 .card-pnl{font-size:13px;margin-bottom:8px}
@@ -147,8 +152,8 @@ tr:hover td{background:#0d1420}
 const REFRESH = 30;
 let cd = REFRESH, cdTimer;
 
-const COLS  = ["col0","col1","col2","col3","col4","col5","col6","col7","col8","col9","col10","col11"];
-const CARDS = ["c0","c1","c2","c3","c4","c5","c6","c7","c8","c9","c10","c11"];
+const COLS  = ["col0","col1","col2","col3","col4","col5","col6","col7","col8","col9","col10","col11","col12","col13","col14","col15","col16","col17"];
+const CARDS = ["c0","c1","c2","c3","c4","c5","c6","c7","c8","c9","c10","c11","c12","c13","c14","c15","c16","c17"];
 
 function pc(v){ return v>0?'up':v<0?'dn':'nu'; }
 function fp(v){ return (v>=0?'+':'')+v.toFixed(2); }
@@ -168,7 +173,7 @@ function render(d){
 
   // Bot cards
   document.getElementById('bot-cards').innerHTML=d.bots.map((b,i)=>{
-    const p=b.portfolio, cc=COLS[b.idx%12], cv=CARDS[b.idx%12];
+    const p=b.portfolio, cc=COLS[b.idx%18], cv=CARDS[b.idx%18];
     const ma=(b.ma_type==='ema'?'EMA':'SMA')+` ${b.ma_fast}/${b.ma_slow}`;
     const tr=(b.trailing_pct*100).toFixed(1);
     const wr=p.trades>0?`${p.wins}/${p.trades} wins`:'0 trades';
@@ -197,7 +202,7 @@ function render(d){
   document.getElementById('pos-body').innerHTML=allPos.length===0
     ?'<tr><td colspan="9" class="empty">Sin posiciones abiertas</td></tr>'
     :allPos.map(pos=>{
-      const cc=COLS[pos.bidx%12], pc2=pc(pos.pnl);
+      const cc=COLS[pos.bidx%18], pc2=pc(pos.pnl);
       const dir=pos.direction==='long'
         ?'<span class="b b-long">LONG</span>'
         :'<span class="b b-short">SHORT</span>';
@@ -220,7 +225,7 @@ function render(d){
   document.getElementById('hist-body').innerHTML=allHist.length===0
     ?'<tr><td colspan="10" class="empty">Sin operaciones cerradas todav&iacute;a</td></tr>'
     :allHist.slice(0,60).map(t=>{
-      const cc=COLS[t.bidx%12], pc2=pc(t.pnl);
+      const cc=COLS[t.bidx%18], pc2=pc(t.pnl);
       const dir=t.direction==='long'
         ?'<span class="b b-long">LONG</span>'
         :'<span class="b b-short">SHORT</span>';
@@ -244,7 +249,7 @@ function render(d){
   document.getElementById('sig-body').innerHTML=allSigs.length===0
     ?'<tr><td colspan="6" class="empty">Esperando se&ntilde;ales &mdash; primer escaneo en curso</td></tr>'
     :allSigs.slice(0,80).map(s=>{
-      const cc=COLS[s.bidx%12];
+      const cc=COLS[s.bidx%18];
       let badge;
       if(s.action.startsWith('ENTRADA')) badge='<span class="b b-entry">ENTRADA</span>';
       else if(s.type==='CIERRE')          badge='<span class="b b-close">CIERRE</span>';

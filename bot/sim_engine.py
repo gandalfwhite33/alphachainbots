@@ -54,6 +54,8 @@ class BotConfig:
     leverage:       float = 3.0
     risk_per_trade: float = 0.02
     idx:            int   = 0
+    require_fib:    bool  = True
+    require_sr:     bool  = True
 
 
 CONFIGS = [
@@ -132,6 +134,50 @@ CONFIGS = [
         interval="1h",        ma_type="ema",  ma_fast=21,  ma_slow=55,
         trailing_pct=0.010,   min_vol_ratio=1.5, sr_near_pct=0.010,
         fibo_zone_pct=0.012,  candle_limit=200,  leverage=5.0,
+    ),
+    # ── Bots 15m LITE — x5, trailing 0.5%, solo EMA + volumen 1.1x ────────────
+    BotConfig(idx=12,
+        name="bot_15m_ema8_lite",  label="BOT·15M·8·L",
+        interval="15m",            ma_type="ema",  ma_fast=8,   ma_slow=21,
+        trailing_pct=0.005,        min_vol_ratio=1.1, sr_near_pct=0.007,
+        fibo_zone_pct=0.010,       candle_limit=300,  leverage=5.0,
+        require_fib=False,         require_sr=False,
+    ),
+    BotConfig(idx=13,
+        name="bot_15m_ema13_lite", label="BOT·15M·13·L",
+        interval="15m",            ma_type="ema",  ma_fast=13,  ma_slow=34,
+        trailing_pct=0.005,        min_vol_ratio=1.1, sr_near_pct=0.007,
+        fibo_zone_pct=0.010,       candle_limit=300,  leverage=5.0,
+        require_fib=False,         require_sr=False,
+    ),
+    BotConfig(idx=14,
+        name="bot_15m_ema21_lite", label="BOT·15M·21·L",
+        interval="15m",            ma_type="ema",  ma_fast=21,  ma_slow=55,
+        trailing_pct=0.005,        min_vol_ratio=1.1, sr_near_pct=0.007,
+        fibo_zone_pct=0.010,       candle_limit=300,  leverage=5.0,
+        require_fib=False,         require_sr=False,
+    ),
+    # ── Bots 30m LITE — x5, trailing 0.8%, solo EMA + volumen 1.1x ────────────
+    BotConfig(idx=15,
+        name="bot_30m_ema8_lite",  label="BOT·30M·8·L",
+        interval="30m",            ma_type="ema",  ma_fast=8,   ma_slow=21,
+        trailing_pct=0.008,        min_vol_ratio=1.1, sr_near_pct=0.008,
+        fibo_zone_pct=0.011,       candle_limit=250,  leverage=5.0,
+        require_fib=False,         require_sr=False,
+    ),
+    BotConfig(idx=16,
+        name="bot_30m_ema13_lite", label="BOT·30M·13·L",
+        interval="30m",            ma_type="ema",  ma_fast=13,  ma_slow=34,
+        trailing_pct=0.008,        min_vol_ratio=1.1, sr_near_pct=0.008,
+        fibo_zone_pct=0.011,       candle_limit=250,  leverage=5.0,
+        require_fib=False,         require_sr=False,
+    ),
+    BotConfig(idx=17,
+        name="bot_30m_ema21_lite", label="BOT·30M·21·L",
+        interval="30m",            ma_type="ema",  ma_fast=21,  ma_slow=55,
+        trailing_pct=0.008,        min_vol_ratio=1.1, sr_near_pct=0.008,
+        fibo_zone_pct=0.011,       candle_limit=250,  leverage=5.0,
+        require_fib=False,         require_sr=False,
     ),
 ]
 
@@ -348,7 +394,7 @@ class VirtualPortfolio:
         with self._lock:
             if coin in self.positions or price <= 0:
                 return False
-            notional = self.cash * cfg.risk_per_trade * cfg.leverage
+            notional = self.equity * 0.95 * cfg.risk_per_trade * cfg.leverage
             size = round(notional / price, 6)
             self.positions[coin] = VirtualPos(
                 coin=coin, direction=direction, size=size,
@@ -495,8 +541,8 @@ class SimBot:
 
                 entry = float(df["close"].iloc[-2])
                 highs, lows = find_pivots(df)
-                ok_sr  = near_sr(entry, highs, lows, cfg.sr_near_pct)
-                ok_fib = near_fibo(entry, calc_fibo(df), cfg.fibo_zone_pct)
+                ok_sr  = near_sr(entry, highs, lows, cfg.sr_near_pct) if cfg.require_sr  else True
+                ok_fib = near_fibo(entry, calc_fibo(df), cfg.fibo_zone_pct) if cfg.require_fib else True
                 ok_vol = volume_ok(df, cfg.min_vol_ratio)
 
                 if not (ok_sr and ok_fib and ok_vol):
