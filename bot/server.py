@@ -17,7 +17,7 @@ import sim_engine
 
 
 # ─── HTML EMBEBIDO ────────────────────────────────────────────────────────────
-DASHBOARD_HTML = b"""<!DOCTYPE html>
+DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -295,7 +295,7 @@ class DashHandler(BaseHTTPRequestHandler):
             self._respond(200, "application/json", body)
 
         elif path in ("/", "/index.html"):
-            self._respond(200, "text/html; charset=utf-8", DASHBOARD_HTML)
+            self._respond(200, "text/html; charset=utf-8", DASHBOARD_HTML.encode("utf-8"))
 
         else:
             self._respond(404, "text/plain", b"Not Found")
