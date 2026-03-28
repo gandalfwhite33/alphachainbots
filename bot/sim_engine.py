@@ -27,7 +27,7 @@ MAX_TRADES      = 100
 
 INTERVAL_MS = {
     "1m": 60_000, "5m": 300_000, "15m": 900_000,
-    "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000,
+    "30m": 1_800_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000,
 }
 
 FALLBACK_COINS = ["BTC", "ETH", "SOL", "HYPE", "TAO", "XRP", "DOGE", "AVAX", "BNB", "LINK"]
@@ -53,26 +53,85 @@ class BotConfig:
     sr_break_pct:   float = 0.004
     leverage:       float = 3.0
     risk_per_trade: float = 0.02
+    idx:            int   = 0
 
 
 CONFIGS = [
-    BotConfig(
-        name="bot_4h",       label="BOT·4H",
-        interval="4h",       ma_type="ema",  ma_fast=20,  ma_slow=50,
-        trailing_pct=0.015,  min_vol_ratio=1.5, sr_near_pct=0.010,
-        fibo_zone_pct=0.015, candle_limit=200,
+    # ── Bots originales (leverage x3) ──────────────────────────────────────────
+    BotConfig(idx=0,
+        name="bot_4h",        label="BOT·4H",
+        interval="4h",        ma_type="ema",  ma_fast=20,  ma_slow=50,
+        trailing_pct=0.015,   min_vol_ratio=1.5, sr_near_pct=0.010,
+        fibo_zone_pct=0.015,  candle_limit=200,
     ),
-    BotConfig(
-        name="bot_1h",       label="BOT·1H·EMA",
-        interval="1h",       ma_type="ema",  ma_fast=20,  ma_slow=50,
-        trailing_pct=0.010,  min_vol_ratio=1.5, sr_near_pct=0.010,
-        fibo_zone_pct=0.012, candle_limit=200,
+    BotConfig(idx=1,
+        name="bot_1h",        label="BOT·1H·EMA",
+        interval="1h",        ma_type="ema",  ma_fast=20,  ma_slow=50,
+        trailing_pct=0.010,   min_vol_ratio=1.5, sr_near_pct=0.010,
+        fibo_zone_pct=0.012,  candle_limit=200,
     ),
-    BotConfig(
-        name="bot_1h_ma",    label="BOT·1H·SMA",
-        interval="1h",       ma_type="sma",  ma_fast=50,  ma_slow=100,
-        trailing_pct=0.010,  min_vol_ratio=1.3, sr_near_pct=0.008,
-        fibo_zone_pct=0.012, candle_limit=300,
+    BotConfig(idx=2,
+        name="bot_1h_ma",     label="BOT·1H·SMA",
+        interval="1h",        ma_type="sma",  ma_fast=50,  ma_slow=100,
+        trailing_pct=0.010,   min_vol_ratio=1.3, sr_near_pct=0.008,
+        fibo_zone_pct=0.012,  candle_limit=300,
+    ),
+    # ── Bots 15m — leverage x5, trailing 0.5% ──────────────────────────────────
+    BotConfig(idx=3,
+        name="bot_15m_ema8",  label="BOT·15M·8/21",
+        interval="15m",       ma_type="ema",  ma_fast=8,   ma_slow=21,
+        trailing_pct=0.005,   min_vol_ratio=1.3, sr_near_pct=0.007,
+        fibo_zone_pct=0.010,  candle_limit=300,  leverage=5.0,
+    ),
+    BotConfig(idx=4,
+        name="bot_15m_ema13", label="BOT·15M·13/34",
+        interval="15m",       ma_type="ema",  ma_fast=13,  ma_slow=34,
+        trailing_pct=0.005,   min_vol_ratio=1.3, sr_near_pct=0.007,
+        fibo_zone_pct=0.010,  candle_limit=300,  leverage=5.0,
+    ),
+    BotConfig(idx=5,
+        name="bot_15m_ema21", label="BOT·15M·21/55",
+        interval="15m",       ma_type="ema",  ma_fast=21,  ma_slow=55,
+        trailing_pct=0.005,   min_vol_ratio=1.3, sr_near_pct=0.007,
+        fibo_zone_pct=0.010,  candle_limit=300,  leverage=5.0,
+    ),
+    # ── Bots 30m — leverage x5, trailing 0.8% ──────────────────────────────────
+    BotConfig(idx=6,
+        name="bot_30m_ema8",  label="BOT·30M·8/21",
+        interval="30m",       ma_type="ema",  ma_fast=8,   ma_slow=21,
+        trailing_pct=0.008,   min_vol_ratio=1.4, sr_near_pct=0.008,
+        fibo_zone_pct=0.011,  candle_limit=250,  leverage=5.0,
+    ),
+    BotConfig(idx=7,
+        name="bot_30m_ema13", label="BOT·30M·13/34",
+        interval="30m",       ma_type="ema",  ma_fast=13,  ma_slow=34,
+        trailing_pct=0.008,   min_vol_ratio=1.4, sr_near_pct=0.008,
+        fibo_zone_pct=0.011,  candle_limit=250,  leverage=5.0,
+    ),
+    BotConfig(idx=8,
+        name="bot_30m_ema21", label="BOT·30M·21/55",
+        interval="30m",       ma_type="ema",  ma_fast=21,  ma_slow=55,
+        trailing_pct=0.008,   min_vol_ratio=1.4, sr_near_pct=0.008,
+        fibo_zone_pct=0.011,  candle_limit=250,  leverage=5.0,
+    ),
+    # ── Bots 1h nuevos — leverage x5, trailing 1% ──────────────────────────────
+    BotConfig(idx=9,
+        name="bot_1h_ema8",   label="BOT·1H·8/21",
+        interval="1h",        ma_type="ema",  ma_fast=8,   ma_slow=21,
+        trailing_pct=0.010,   min_vol_ratio=1.5, sr_near_pct=0.010,
+        fibo_zone_pct=0.012,  candle_limit=200,  leverage=5.0,
+    ),
+    BotConfig(idx=10,
+        name="bot_1h_ema13",  label="BOT·1H·13/34",
+        interval="1h",        ma_type="ema",  ma_fast=13,  ma_slow=34,
+        trailing_pct=0.010,   min_vol_ratio=1.5, sr_near_pct=0.010,
+        fibo_zone_pct=0.012,  candle_limit=200,  leverage=5.0,
+    ),
+    BotConfig(idx=11,
+        name="bot_1h_ema21",  label="BOT·1H·21/55",
+        interval="1h",        ma_type="ema",  ma_fast=21,  ma_slow=55,
+        trailing_pct=0.010,   min_vol_ratio=1.5, sr_near_pct=0.010,
+        fibo_zone_pct=0.012,  candle_limit=200,  leverage=5.0,
     ),
 ]
 
@@ -469,6 +528,7 @@ class SimBot:
         with self._sig_lock:
             sigs = list(self.signals)
         return {
+            "idx":          self.cfg.idx,
             "label":        self.cfg.label,
             "interval":     self.cfg.interval,
             "ma_type":      self.cfg.ma_type,
