@@ -14,6 +14,7 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sim_engine
+import backtest_engine
 
 
 # ─── HTML EMBEBIDO ────────────────────────────────────────────────────────────
@@ -116,6 +117,22 @@ tr:hover td{background:#0d1420}
 .fund-pos{color:#00e676;font-weight:bold}.fund-neg{color:#ff4466;font-weight:bold}.fund-nu{color:#546e7a}
 .ls-bull{color:#69f0ae}.ls-bear{color:#ff6b6b}
 .oi-icon{font-size:11px;margin-right:2px}
+
+/* ── BACKTEST ── */
+.bt-ph{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.bt-tabs{display:flex;gap:6px}
+.bt-tab{padding:3px 12px;border:1px solid #1e3a4a;border-radius:3px;font-size:11px;font-weight:bold;cursor:pointer;background:#0a0f1c;color:#546e7a;transition:all .2s;letter-spacing:.5px}
+.bt-tab.active{background:#0d2030;border-color:#4fc3f7;color:#4fc3f7}
+.bt-pbar-bg{height:4px;background:#0a0f1c;border-radius:2px;overflow:hidden;margin-top:6px}
+.bt-pbar-fill{height:100%;background:linear-gradient(90deg,#4fc3f7,#00e676);border-radius:2px;transition:width .4s}
+.bt-status{font-size:11px;color:#546e7a;margin-top:6px}
+.bt-eq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;padding:10px}
+.bt-eq-card{background:#060c16;border:1px solid #0d1a28;border-radius:6px;padding:8px}
+.bt-eq-title{font-size:10px;font-weight:bold;margin-bottom:4px;letter-spacing:1px}
+.bt-eq-canvas{position:relative;height:110px}
+.bt-eq-meta{display:flex;gap:8px;font-size:9px;color:#546e7a;margin-top:4px;flex-wrap:wrap}
+.bt-sec-title{font-size:11px;color:#4fc3f7;padding:10px 10px 4px;letter-spacing:.5px}
+@media(max-width:580px){.bt-eq-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -176,6 +193,51 @@ tr:hover td{background:#0d1420}
 
   </div>
   <!-- ── FIN MARKET DATA ─────────────────────────────────────────────────── -->
+
+  <!-- ── BACKTEST SECTION ────────────────────────────────────────────────── -->
+  <div class="panel" id="bt-section">
+    <div class="ph bt-ph">
+      <span>&#x1F4CA; Backtest Hist&oacute;rico</span>
+      <div class="bt-tabs">
+        <button class="bt-tab active" onclick="btLoad('3m')">3M</button>
+        <button class="bt-tab" onclick="btLoad('6m')">6M</button>
+        <button class="bt-tab" onclick="btLoad('1y')">1A</button>
+        <button class="bt-tab" onclick="btLoad('max')">M&Aacute;X</button>
+      </div>
+    </div>
+    <div style="padding:10px 10px 4px" id="bt-prog-wrap">
+      <div class="bt-pbar-bg"><div class="bt-pbar-fill" id="bt-pbar" style="width:0%"></div></div>
+      <div class="bt-status" id="bt-status">Selecciona un periodo para iniciar el backtest &mdash; los datos se calculan en segundo plano.</div>
+    </div>
+    <div id="bt-results" style="display:none">
+      <!-- Equity curves grid -->
+      <div class="bt-sec-title">Equity Curves &mdash; <span id="bt-period-lbl"></span></div>
+      <div class="bt-eq-grid" id="bt-eq-grid"></div>
+
+      <!-- PnL bar chart -->
+      <div class="bt-sec-title">Comparativa PnL por Bot</div>
+      <div style="padding:0 10px 10px;position:relative;height:230px">
+        <canvas id="bt-bar-canvas"></canvas>
+      </div>
+
+      <!-- Comparison table -->
+      <div class="bt-sec-title">Tabla Comparativa <span style="color:#37505f;font-size:9px">(ordenado por PnL desc)</span></div>
+      <div class="tbl-wrap" style="padding:0 10px 10px">
+        <table id="bt-tbl">
+          <thead><tr>
+            <th>#</th><th>Bot</th><th>Estrategia</th>
+            <th>PnL $</th><th>PnL %</th><th>Win%</th>
+            <th>Trades</th><th>Max DD%</th>
+            <th>Mejor $</th><th>Peor $</th>
+            <th>Sharpe</th><th>PF</th>
+          </tr></thead>
+          <tbody id="bt-tbody"></tbody>
+        </table>
+      </div>
+      <div style="font-size:9px;color:#263a4a;padding:4px 10px 10px" id="bt-computed-at"></div>
+    </div>
+  </div>
+  <!-- ── FIN BACKTEST ─────────────────────────────────────────────────────── -->
 
   <div class="grid3" id="bot-cards">
     <div class="card c0"><div class="card-name col0">BOT&middot;4H</div><div class="card-meta">Cargando&hellip;</div></div>
@@ -547,6 +609,157 @@ function fetchMarket(){
 
 fetchData();
 fetchMarket();
+
+// ── BACKTEST ──────────────────────────────────────────────────────────────────
+let _btPeriod = null, _btPoll = null;
+const _eqCharts = {};
+let _btBarChart = null;
+const BT_PERIOD_LBL = {'3m':'3 Meses','6m':'6 Meses','1y':'1 Año','max':'Máximo'};
+
+function btLoad(period){
+  if(_btPeriod === period) return;
+  _btPeriod = period;
+  document.querySelectorAll('.bt-tab').forEach((b,i)=>{
+    b.classList.toggle('active', ['3m','6m','1y','max'][i]===period);
+  });
+  const resEl = document.getElementById('bt-results');
+  const progEl = document.getElementById('bt-prog-wrap');
+  resEl.style.display = 'none';
+  progEl.style.display = 'block';
+  document.getElementById('bt-pbar').style.width = '0%';
+  document.getElementById('bt-status').textContent = 'Iniciando backtest en segundo plano…';
+  fetch('/api/backtest/start?period='+period).catch(()=>{});
+  clearInterval(_btPoll);
+  _btPoll = setInterval(btPollOnce, 2500);
+}
+
+function btPollOnce(){
+  if(!_btPeriod) return;
+  fetch('/api/backtest?period='+_btPeriod)
+    .then(r=>r.json())
+    .then(d=>{
+      const pct = d.progress ?? 0;
+      document.getElementById('bt-pbar').style.width = Math.max(2,pct)+'%';
+      if(pct < 0){
+        document.getElementById('bt-status').textContent = '⚠ Error en el backtest.';
+        clearInterval(_btPoll);
+      } else if(pct >= 100 && d.result){
+        clearInterval(_btPoll);
+        document.getElementById('bt-status').textContent = 'Completado.';
+        document.getElementById('bt-prog-wrap').style.display = 'none';
+        btShowResults(d.result);
+      } else {
+        document.getElementById('bt-status').textContent = `Calculando… ${pct}% — obteniendo velas históricas y simulando estrategias`;
+      }
+    }).catch(()=>{});
+}
+
+function btShowResults(data){
+  if(!data||!data.bots) return;
+  document.getElementById('bt-results').style.display = 'block';
+  const lbl = BT_PERIOD_LBL[data.period] || data.period;
+  document.getElementById('bt-period-lbl').textContent = lbl + ' · ' + data.computed_at;
+  btRenderEquity(data.bots);
+  btRenderBar(data.bots);
+  btRenderTable(data.bots);
+  document.getElementById('bt-computed-at').textContent = 'Calculado: ' + data.computed_at + ' · Capital inicial $10,000 por bot';
+}
+
+function btRenderEquity(bots){
+  const grid = document.getElementById('bt-eq-grid');
+  grid.innerHTML = '';
+  // Destroy old charts
+  Object.keys(_eqCharts).forEach(k=>{ if(_eqCharts[k]){_eqCharts[k].destroy();delete _eqCharts[k];} });
+
+  bots.forEach((b,i)=>{
+    const card = document.createElement('div');
+    card.className = 'bt-eq-card';
+    const pCls = b.total_pnl>=0?'up':'dn';
+    const sign = b.total_pnl>=0?'+':'';
+    card.innerHTML = `
+      <div class="bt-eq-title ${COLS[b.idx%18]}">${b.label}</div>
+      <div class="bt-eq-canvas"><canvas id="bteq${i}"></canvas></div>
+      <div class="bt-eq-meta">
+        <span class="${pCls}">${sign}${b.total_pnl.toFixed(0)}$ (${sign}${b.total_pnl_pct.toFixed(1)}%)</span>
+        <span>${b.win_rate}% wr</span>
+        <span>${b.total_trades} ops</span>
+        <span class="${b.max_drawdown>15?'dn':'nu'}">DD ${b.max_drawdown}%</span>
+        <span class="${b.sharpe>=1?'up':b.sharpe<0?'dn':'nu'}">S ${b.sharpe}</span>
+        <span class="${b.profit_factor>=1?'up':'dn'}">PF ${b.profit_factor}</span>
+      </div>`;
+    grid.appendChild(card);
+
+    requestAnimationFrame(()=>{
+      const cv = document.getElementById('bteq'+i);
+      if(!cv||!b.equity_curve||b.equity_curve.length<2) return;
+      const color = b.total_pnl>=0?'#00e676':'#ff4466';
+      const bg    = b.total_pnl>=0?'rgba(0,230,118,0.07)':'rgba(255,68,102,0.07)';
+      _eqCharts[i] = new Chart(cv, {
+        type:'line',
+        data:{
+          labels: b.equity_curve.map(p=>new Date(p[0]).toLocaleDateString('es',{month:'short',day:'numeric'})),
+          datasets:[{data:b.equity_curve.map(p=>p[1]),borderColor:color,borderWidth:1.5,
+            fill:true,backgroundColor:bg,pointRadius:0,tension:0.25}]
+        },
+        options:{
+          responsive:true,maintainAspectRatio:false,animation:{duration:250},
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'$'+c.raw.toFixed(0)}}},
+          scales:{
+            x:{display:false},
+            y:{grid:{color:'#0a0f1c'},ticks:{color:'#546e7a',font:{size:8},callback:v=>'$'+v.toFixed(0)}}
+          }
+        }
+      });
+    });
+  });
+}
+
+function btRenderBar(bots){
+  const cv = document.getElementById('bt-bar-canvas');
+  if(!cv) return;
+  if(_btBarChart){_btBarChart.destroy();_btBarChart=null;}
+  const labels = bots.map(b=>b.label.replace('BOT·','').replace('LIQ·','LIQ·'));
+  const vals   = bots.map(b=>b.total_pnl);
+  const colors = vals.map(v=>v>=0?'rgba(0,230,118,0.8)':'rgba(255,68,102,0.8)');
+  _btBarChart = new Chart(cv,{
+    type:'bar',
+    data:{labels,datasets:[{data:vals,backgroundColor:colors,borderWidth:0}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:{duration:350},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'$'+c.raw.toFixed(2)}}},
+      scales:{
+        x:{grid:{color:'#0d1520'},ticks:{color:'#c9d4e0',font:{size:9},maxRotation:55,minRotation:35}},
+        y:{grid:{color:'#0d1520'},ticks:{color:'#546e7a',font:{size:9},callback:v=>'$'+v}}
+      }
+    }
+  });
+}
+
+function btRenderTable(bots){
+  const tb = document.getElementById('bt-tbody');
+  if(!tb) return;
+  tb.innerHTML = bots.map((b,i)=>{
+    const pCls = b.total_pnl>=0?'up':'dn';
+    const ddCls= b.max_drawdown>20?'dn':b.max_drawdown>10?'':'nu';
+    const sCls = b.sharpe>=1.0?'up':b.sharpe<0?'dn':'nu';
+    const pfCls= b.profit_factor>=1.0?'up':'dn';
+    const sign = b.total_pnl>=0?'+':'';
+    return `<tr>
+      <td style="color:#37505f">${i+1}</td>
+      <td class="${COLS[b.idx%18]}">${b.label}</td>
+      <td style="font-size:10px;color:#78909c">${b.strategy}</td>
+      <td class="${pCls}">${sign}${b.total_pnl.toFixed(2)}</td>
+      <td class="${pCls}">${sign}${b.total_pnl_pct.toFixed(1)}%</td>
+      <td>${b.win_rate}%</td>
+      <td>${b.total_trades}</td>
+      <td class="${ddCls}">${b.max_drawdown}%</td>
+      <td class="up">+${b.best_trade.toFixed(2)}</td>
+      <td class="dn">${b.worst_trade.toFixed(2)}</td>
+      <td class="${sCls}">${b.sharpe}</td>
+      <td class="${pfCls}">${b.profit_factor}</td>
+    </tr>`;
+  }).join('');
+}
 </script>
 </body>
 </html>"""
@@ -576,6 +789,25 @@ class DashHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 body = json.dumps({"error": str(e)}).encode()
             self._respond(200, "application/json", body)
+
+        elif path == "/api/backtest":
+            period = "3m"
+            if "period=" in self.path:
+                period = self.path.split("period=")[-1].split("&")[0].strip()
+            data = {
+                "progress": backtest_engine.get_progress(period),
+                "result":   backtest_engine.get_result(period),
+            }
+            self._respond(200, "application/json", json.dumps(data).encode())
+
+        elif path == "/api/backtest/start":
+            period = "3m"
+            if "period=" in self.path:
+                period = self.path.split("period=")[-1].split("&")[0].strip()
+            if period not in ("3m", "6m", "1y", "max"):
+                period = "3m"
+            backtest_engine.run_backtest_bg(period)
+            self._respond(200, "application/json", b'{"ok":true}')
 
         elif path in ("/", "/index.html"):
             self._respond(200, "text/html; charset=utf-8", DASHBOARD_HTML.encode("utf-8"))
