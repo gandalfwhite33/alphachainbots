@@ -104,26 +104,18 @@ tr:hover td{background:#0d1420}
 .mkt-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
 @media(max-width:900px){.mkt-grid{grid-template-columns:1fr}}
 .mkt-upd{font-size:10px;color:#37505f}
-/* Heatmap */
-.hmap-wrap{display:flex;gap:10px;flex-wrap:wrap}
-.hmap-coin{flex:1;min-width:180px}
-.hmap-title{font-size:11px;font-weight:bold;margin-bottom:6px;letter-spacing:1px}
-.hmap-body{position:relative;height:240px;overflow-y:auto;border:1px solid #0d1520;border-radius:4px}
-.hmap-row{display:flex;align-items:center;gap:6px;padding:2px 6px;font-size:10px;border-bottom:1px solid #080e18;cursor:default}
-.hmap-row:hover{background:#0d1420}
-.hmap-price{width:72px;text-align:right;color:#c9d4e0;flex-shrink:0}
-.hmap-bar-wrap{flex:1;height:12px;background:#0a0f1c;border-radius:2px;overflow:hidden}
-.hmap-bar{height:100%;border-radius:2px;transition:width .4s}
-.hmap-bar.long{background:#1a4a2e}
-.hmap-bar.short{background:#3a1020}
-.hmap-bar.long.big{background:#00c853}
-.hmap-bar.short.big{background:#ff1744}
-.hmap-amt{width:60px;text-align:right;color:#546e7a;flex-shrink:0}
-.hmap-cur{background:#1a2a3a!important;border-left:3px solid #4fc3f7}
-/* OI/Funding table */
+/* Heatmap tabs */
+.hmap-tabs{display:flex;gap:6px;margin-bottom:8px}
+.hmap-tab{padding:3px 12px;border:1px solid #1e3a4a;border-radius:3px;font-size:11px;font-weight:bold;cursor:pointer;background:#0a0f1c;color:#546e7a;letter-spacing:1px;transition:all .2s}
+.hmap-tab.active{background:#0d2030;border-color:#4fc3f7;color:#4fc3f7}
+.hmap-pane{display:none}.hmap-pane.active{display:block}
+.hmap-canvas-wrap{position:relative;height:280px}
+.hmap-danger{font-size:10px;color:#ff6b6b;margin-top:4px;min-height:16px}
+/* OI/Funding compact table */
 .oi-pos{color:#00e676}.oi-neg{color:#ff4466}.oi-nu{color:#78909c}
 .fund-pos{color:#00e676;font-weight:bold}.fund-neg{color:#ff4466;font-weight:bold}.fund-nu{color:#546e7a}
 .ls-bull{color:#69f0ae}.ls-bear{color:#ff6b6b}
+.oi-icon{font-size:11px;margin-right:2px}
 </style>
 </head>
 <body>
@@ -140,30 +132,42 @@ tr:hover td{background:#0d1420}
   <!-- ── MARKET DATA SECTION ─────────────────────────────────────────────── -->
   <div class="mkt-grid">
 
-    <!-- Liquidation Heatmap -->
+    <!-- Liquidation Heatmap Chart.js -->
     <div class="panel">
       <div class="ph">
-        <span>Liquidation Heatmap — BTC / ETH / SOL</span>
+        <span>Liquidation Heatmap</span>
         <span class="mkt-upd">5 min &middot; <span id="mkt-cd">—</span> &middot; <span id="mkt-upd-ts">—</span></span>
       </div>
       <div style="padding:10px">
-        <div class="hmap-wrap" id="hmap-wrap">
-          <div class="hmap-coin"><div class="hmap-title col0">BTC</div><div class="hmap-body" id="hmap-BTC"><div class="empty">Cargando&hellip;</div></div></div>
-          <div class="hmap-coin"><div class="hmap-title col1">ETH</div><div class="hmap-body" id="hmap-ETH"><div class="empty">Cargando&hellip;</div></div></div>
-          <div class="hmap-coin"><div class="hmap-title col2">SOL</div><div class="hmap-body" id="hmap-SOL"><div class="empty">Cargando&hellip;</div></div></div>
+        <div class="hmap-tabs">
+          <button class="hmap-tab active" onclick="switchTab('BTC')">BTC</button>
+          <button class="hmap-tab" onclick="switchTab('ETH')">ETH</button>
+          <button class="hmap-tab" onclick="switchTab('SOL')">SOL</button>
+        </div>
+        <div id="hpane-BTC" class="hmap-pane active">
+          <div class="hmap-canvas-wrap"><canvas id="hchart-BTC"></canvas></div>
+          <div class="hmap-danger" id="hdanger-BTC"></div>
+        </div>
+        <div id="hpane-ETH" class="hmap-pane">
+          <div class="hmap-canvas-wrap"><canvas id="hchart-ETH"></canvas></div>
+          <div class="hmap-danger" id="hdanger-ETH"></div>
+        </div>
+        <div id="hpane-SOL" class="hmap-pane">
+          <div class="hmap-canvas-wrap"><canvas id="hchart-SOL"></canvas></div>
+          <div class="hmap-danger" id="hdanger-SOL"></div>
         </div>
       </div>
     </div>
 
-    <!-- OI + Funding + L/S Table -->
+    <!-- OI + Funding + L/S Table compact -->
     <div class="panel">
-      <div class="ph"><span>Open Interest &middot; Funding Rate &middot; L/S Ratio</span></div>
+      <div class="ph"><span>Open Interest &middot; Funding &middot; L/S</span></div>
       <div class="tbl-wrap">
         <table>
           <thead><tr>
             <th>Coin</th><th>Precio</th>
-            <th>OI (USD)</th><th>OI Chg 5m</th>
-            <th>Funding %</th><th>L/S</th><th>Vol 24h</th>
+            <th>OI</th><th>&#916;OI</th>
+            <th>Fund%</th><th>L/S</th><th>Vol24h</th>
           </tr></thead>
           <tbody id="oi-body"><tr><td colspan="7" class="empty">Cargando&hellip;</td></tr></tbody>
         </table>
@@ -210,6 +214,7 @@ tr:hover td{background:#0d1420}
 </div>
 <div class="pbar"><div class="pfill" id="pfill" style="width:100%"></div></div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 const REFRESH = 30;
 let cd = REFRESH, cdTimer;
@@ -351,6 +356,8 @@ function fetchData(){
 // ── MARKET DATA ──────────────────────────────────────────────────────────────
 const MKT_REFRESH = 300;
 let mktCd = MKT_REFRESH, mktTimer;
+const _liqCharts = {};
+let _activeTab = 'BTC';
 
 function fmtM(v){
   if(v>=1e9) return '$'+(v/1e9).toFixed(2)+'B';
@@ -359,36 +366,132 @@ function fmtM(v){
   return '$'+v.toFixed(0);
 }
 
-function renderHeatmap(coin, data){
-  const el = document.getElementById('hmap-'+coin);
-  if(!el) return;
+function switchTab(coin){
+  _activeTab = coin;
+  document.querySelectorAll('.hmap-tab').forEach(b=>{
+    b.classList.toggle('active', b.textContent===coin);
+  });
+  document.querySelectorAll('.hmap-pane').forEach(p=>{
+    p.classList.toggle('active', p.id==='hpane-'+coin);
+  });
+}
+
+// Custom plugin: draw current-price horizontal line
+const priceLinePlugin = {
+  id: 'priceLine',
+  afterDatasetsDraw(chart){
+    const meta = chart.config.options._priceMeta;
+    if(!meta) return;
+    const {price, labels} = meta;
+    // Find bar index closest to price
+    let bestIdx = -1, bestDist = Infinity;
+    labels.forEach((lbl, i)=>{
+      const d = Math.abs(parseFloat(lbl.replace(/[^0-9.]/g,'')) - price);
+      if(d < bestDist){ bestDist=d; bestIdx=i; }
+    });
+    if(bestIdx<0) return;
+    const yScale = chart.scales.y;
+    const xScale = chart.scales.x;
+    const y = yScale.getPixelForValue(bestIdx);
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.setLineDash([4,3]);
+    ctx.strokeStyle = '#4fc3f7';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(xScale.left, y);
+    ctx.lineTo(xScale.right, y);
+    ctx.stroke();
+    // Label
+    ctx.fillStyle = '#4fc3f7';
+    ctx.font = 'bold 9px monospace';
+    ctx.fillText('▶ '+fmtPx(price), xScale.left+2, y-3);
+    ctx.restore();
+  }
+};
+if(typeof Chart !== 'undefined'){
+  Chart.register(priceLinePlugin);
+}
+
+function renderHeatmapChart(coin, data){
+  const canvas = document.getElementById('hchart-'+coin);
+  if(!canvas) return;
   const zones = data.zones || [];
   const price = data.price || 0;
-  if(!zones.length){ el.innerHTML='<div class="empty">Sin datos</div>'; return; }
-  const maxLiq = Math.max(...zones.map(z=>z.liq_usd));
-  // Sort descending by price to show price scale top→bottom
-  const sorted = [...zones].sort((a,b)=>b.price-a.price);
-  // Find index closest to current price
-  let curIdx = sorted.findIndex(z=>z.price<=price);
-  if(curIdx<0) curIdx = sorted.length-1;
-  el.innerHTML = sorted.map((z,i)=>{
-    const barW  = maxLiq>0 ? Math.round(z.liq_usd/maxLiq*100) : 0;
-    const isBig = z.liq_usd >= maxLiq*0.3;
-    const isCur = Math.abs(i-curIdx)<=1;
-    const cls   = z.type==='long'?(isBig?'long big':'long'):(isBig?'short big':'short');
-    const pxStr = price>=1000? fmtPx(z.price) : fmtPx(z.price);
-    const amtStr = fmtM(z.liq_usd);
-    const distCls = z.type==='long'?'dn':'up';
-    return `<div class="hmap-row${isCur?' hmap-cur':''}">
-      <span class="hmap-price">${pxStr}</span>
-      <div class="hmap-bar-wrap"><div class="hmap-bar ${cls}" style="width:${barW}%"></div></div>
-      <span class="hmap-amt ${distCls}">${amtStr}</span>
-    </div>`;
-  }).join('');
-  // Scroll to current price
-  if(curIdx>=0){
-    const rows = el.querySelectorAll('.hmap-row');
-    if(rows[curIdx]) rows[curIdx].scrollIntoView({block:'center',behavior:'smooth'});
+  if(!zones.length) return;
+
+  // Sort ascending by price (Chart.js indexAxis:y renders bottom→top by default, we reverse)
+  const sorted = [...zones].sort((a,b)=>a.price-b.price);
+  const maxLiq = Math.max(...sorted.map(z=>z.liq_usd));
+
+  const labels = sorted.map(z=> fmtPx(z.price));
+  const longData  = sorted.map(z=> z.type==='long'  ? z.liq_usd : 0);
+  const shortData = sorted.map(z=> z.type==='short' ? z.liq_usd : 0);
+
+  // Intensity-based colors
+  const longColors  = longData.map(v=>{
+    const a = maxLiq>0 ? 0.25 + 0.75*(v/maxLiq) : 0.4;
+    return `rgba(0,200,83,${a.toFixed(2)})`;
+  });
+  const shortColors = shortData.map(v=>{
+    const a = maxLiq>0 ? 0.25 + 0.75*(v/maxLiq) : 0.4;
+    return `rgba(255,23,68,${a.toFixed(2)})`;
+  });
+
+  // Destroy previous chart
+  if(_liqCharts[coin]){ _liqCharts[coin].destroy(); }
+
+  _liqCharts[coin] = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label:'Long Liq', data:longData,  backgroundColor:longColors,  borderWidth:0 },
+        { label:'Short Liq', data:shortData, backgroundColor:shortColors, borderWidth:0 }
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 400 },
+      _priceMeta: { price, labels },
+      plugins: {
+        legend: { display:false },
+        tooltip: {
+          callbacks: {
+            label(ctx){
+              const v = ctx.raw;
+              if(!v) return null;
+              return (ctx.dataset.label||'') + ': ' + fmtM(v);
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          stacked: true,
+          grid: { color:'#0d1520' },
+          ticks: { color:'#546e7a', font:{size:9}, callback: v=>fmtM(v) }
+        },
+        y: {
+          stacked: true,
+          grid: { color:'#0a0f1c' },
+          ticks: { color:'#c9d4e0', font:{size:9}, maxTicksLimit:14 }
+        }
+      }
+    }
+  });
+
+  // Danger zones — top 3 by liq_usd
+  const top3 = [...zones].sort((a,b)=>b.liq_usd-a.liq_usd).slice(0,3);
+  const dEl = document.getElementById('hdanger-'+coin);
+  if(dEl){
+    dEl.innerHTML = top3.map(z=>{
+      const dir = z.type==='long'?'&#x25BC;':'&#x25B2;';
+      const cls = z.type==='long'?'oi-neg':'oi-pos';
+      return `<span class="${cls}">${dir} $${fmtPx(z.price)} &rarr; ${fmtM(z.liq_usd)}</span>`;
+    }).join(' &nbsp; ');
   }
 }
 
@@ -398,16 +501,18 @@ function renderOI(rows){
   if(!rows||!rows.length){ el.innerHTML='<tr><td colspan="7" class="empty">Sin datos</td></tr>'; return; }
   el.innerHTML = rows.map(r=>{
     const fCls = r.funding>0?'fund-pos':r.funding<0?'fund-neg':'fund-nu';
+    const fIcon = r.funding>0.0005?'🔴':r.funding<-0.0005?'🟢':'⚪';
     const oCls = r.oi_chg>0?'oi-pos':r.oi_chg<0?'oi-neg':'oi-nu';
+    const oIcon = r.oi_chg>0?'↑':r.oi_chg<0?'↓':'→';
     const lsCls = r.ls_ratio>1.05?'ls-bull':r.ls_ratio<0.95?'ls-bear':'';
     return `<tr>
       <td><b>${r.coin}</b></td>
-      <td>$${fmtPx(r.price)}</td>
-      <td>${fmtM(r.oi_usd)}</td>
-      <td class="${oCls}">${r.oi_chg>=0?'+':''}${r.oi_chg}%</td>
-      <td class="${fCls}">${r.funding>=0?'+':''}${r.funding.toFixed(4)}%</td>
-      <td class="${lsCls}">${r.ls_ratio.toFixed(2)}</td>
-      <td>${fmtM(r.vol_24h)}</td>
+      <td style="font-size:10px">$${fmtPx(r.price)}</td>
+      <td style="font-size:10px">${fmtM(r.oi_usd)}</td>
+      <td class="${oCls}" style="font-size:10px"><span class="oi-icon">${oIcon}</span>${r.oi_chg>=0?'+':''}${r.oi_chg}%</td>
+      <td class="${fCls}" style="font-size:10px">${fIcon} ${r.funding>=0?'+':''}${r.funding.toFixed(3)}%</td>
+      <td class="${lsCls}" style="font-size:10px">${r.ls_ratio.toFixed(2)}</td>
+      <td style="font-size:10px">${fmtM(r.vol_24h)}</td>
     </tr>`;
   }).join('');
 }
@@ -416,7 +521,7 @@ function renderMarket(d){
   if(d.oi_table) renderOI(d.oi_table);
   if(d.liq){
     for(const coin of ['BTC','ETH','SOL']){
-      if(d.liq[coin]) renderHeatmap(coin, d.liq[coin]);
+      if(d.liq[coin]) renderHeatmapChart(coin, d.liq[coin]);
     }
   }
   if(d.updated_at) document.getElementById('mkt-upd-ts').textContent=d.updated_at;
