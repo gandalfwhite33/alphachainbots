@@ -1119,10 +1119,12 @@ def main():
     print(f"\n{sep}")
     print(f"[{ts()}]  AlphaChainBots Optimizer v3 — {VERSION}")
     print(sep)
+    print(f"  Cores disponibles      : {os.cpu_count()}")
     print(f"  Combinaciones posibles : {TOTAL_COMBOS:,}")
     print(f"  A probar               : {args.samples:,}")
     print(f"  Días de historial      : {args.days}")
     print(f"  Workers                : {n_workers}")
+    print(f"  Método multiprocessing : {mp.get_start_method()}")
     print(f"  Salida                 : {out_dir.resolve()}")
     print(f"{sep}\n")
 
@@ -1344,4 +1346,7 @@ def main():
 
 
 if __name__ == "__main__":
+    # 'fork' evita reinicializar el proceso completo en cada worker (Linux).
+    # Debe llamarse antes de cualquier Pool y dentro de __main__.
+    mp.set_start_method("fork", force=True)
     main()
