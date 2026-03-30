@@ -18,9 +18,10 @@ import hashlib
 import pickle
 import traceback
 import multiprocessing as mp
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, asdict, fields
 from datetime import datetime
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 from pathlib import Path
 
 import numpy as np
@@ -200,41 +201,50 @@ def load_or_fetch(cache_dir: Path, coin: str, interval: str, days: int) -> Optio
     if cache_file.exists():
         try:
             with open(cache_file, "rb") as f:
-                return pickle.load(f)
+                data = pickle.load(f)
+            if data is not None and len(data) > 50:
+                return data
         except Exception:
             pass
+    # Pequeña pausa aleatoria para evitar rate-limit 429 en descargas paralelas
+    time.sleep(random.uniform(0.05, 0.25))
     arr = _fetch_hl(coin, interval, days)
     if arr is not None and len(arr) > 50:
-        with open(cache_file, "wb") as f:
-            pickle.dump(arr, f)
+        try:
+            with open(cache_file, "wb") as f:
+                pickle.dump(arr, f)
+        except Exception:
+            pass
     return arr
 
 
 # ─── INDICADORES VECTORIZADOS ─────────────────────────────────────────────────
 def _ema(arr: np.ndarray, n: int) -> np.ndarray:
-    out = np.full_like(arr, np.nan)
-    k   = 2.0 / (n + 1)
-    valid = np.where(~np.isnan(arr))[0]
-    if len(valid) < n:
-        return out
-    i0 = valid[0]
-    if i0 + n - 1 >= len(arr):
-        return out
-    out[i0 + n - 1] = np.mean(arr[i0: i0 + n])
-    for i in range(i0 + n, len(arr)):
-        prev = out[i - 1]
-        v    = arr[i]
-        if np.isnan(v):
-            out[i] = prev
-        else:
-            out[i] = v * k + prev * (1 - k)
+    """EMA vectorizado — asume que arr no tiene NaN (precios de cierre limpios)."""
+    if len(arr) < n:
+        return np.full_like(arr, np.nan)
+    out = np.empty_like(arr)
+    out[:n - 1] = np.nan
+    out[n - 1]  = float(np.mean(arr[:n]))
+    k = 2.0 / (n + 1)
+    k1 = 1.0 - k
+    # Bucle Cython-friendly: sin branches dentro del loop
+    prev = out[n - 1]
+    for i in range(n, len(arr)):
+        prev = arr[i] * k + prev * k1
+        out[i] = prev
     return out
 
 
 def _sma(arr: np.ndarray, n: int) -> np.ndarray:
+    """SMA vectorizado con cumsum — O(n), sin bucle Python."""
+    if len(arr) < n:
+        return np.full_like(arr, np.nan)
     out = np.full_like(arr, np.nan)
-    for i in range(n - 1, len(arr)):
-        out[i] = np.mean(arr[i - n + 1: i + 1])
+    cs = np.cumsum(arr)
+    # out[n-1] = mean(arr[0:n]), out[i] = (cs[i] - cs[i-n]) / n
+    out[n - 1] = cs[n - 1] / n
+    out[n:]    = (cs[n:] - cs[: len(arr) - n]) / n
     return out
 
 
@@ -854,7 +864,6 @@ def save_pdf(out_dir: Path, global_top: List[dict], tf_tops: Dict[str, List[dict
                         fontsize=14, color=ACC, weight="bold")
                 headers = ["#", "MA", "Lev", "Trail%", "SL", "RSI_F", "EMA200", "ATR_F",
                            "Fib", "Cpnd", "Risk%", "PnL$", "WR%", "DD%", "Sharpe", "PF"]
-                col_w = 1.0 / len(headers)
                 ax.text(0.02, 0.87, "  ".join(f"{h:>7}" for h in headers),
                         fontsize=6.5, color=ACC, family="monospace")
                 y = 0.79
@@ -1073,22 +1082,40 @@ def main():
         else:
             print(f"[{ts()}] ⚠ No se encontró checkpoint — iniciando desde cero\n")
 
-    # ── Descargar velas históricas ────────────────────────────────────────────
-    print(f"[{ts()}] Descargando velas: {len(COINS)} monedas × {len(TIMEFRAMES)} timeframes…")
+    # ── Descargar velas históricas en PARALELO ────────────────────────────────
+    total_tasks = len(COINS) * len(TIMEFRAMES)
+    print(f"[{ts()}] Descargando velas: {len(COINS)} monedas × {len(TIMEFRAMES)} TF "
+          f"= {total_tasks} tareas en paralelo…")
     candles: Dict[str, Dict[str, np.ndarray]] = {tf: {} for tf in TIMEFRAMES}
+    dl_ok = 0
+    dl_fail = 0
 
-    for tf in TIMEFRAMES:
-        for coin in COINS:
-            arr = load_or_fetch(cache_dir, coin, tf, args.days)
+    def _dl_task(coin: str, tf: str) -> Tuple[str, str, Optional[np.ndarray]]:
+        arr = load_or_fetch(cache_dir, coin, tf, args.days)
+        return coin, tf, arr
+
+    with ThreadPoolExecutor(max_workers=min(total_tasks, 20)) as ex:
+        futures = {ex.submit(_dl_task, coin, tf): (coin, tf)
+                   for tf in TIMEFRAMES for coin in COINS}
+        for fut in as_completed(futures):
+            coin, tf_key = futures[fut]
+            try:
+                _, _, arr = fut.result()
+            except Exception as e:
+                print(f"  [ERR] {coin}/{tf_key}: {e}")
+                dl_fail += 1
+                continue
             if arr is not None and len(arr) > 50:
-                candles[tf][coin] = arr
-                print(f"  [OK] {coin:6s}/{tf}  {len(arr):,} velas")
+                candles[tf_key][coin] = arr
+                print(f"  [OK] {coin:6s}/{tf_key:4s}  {len(arr):,} velas")
+                dl_ok += 1
             else:
-                print(f"  [--] {coin:6s}/{tf}  sin datos")
-        time.sleep(0.1)
+                print(f"  [--] {coin:6s}/{tf_key:4s}  sin datos")
+                dl_fail += 1
 
     total_ok = sum(len(v) for v in candles.values())
-    print(f"\n[{ts()}] {total_ok} pares coin/timeframe disponibles\n")
+    print(f"\n[{ts()}] Descarga completada: {dl_ok} OK / {dl_fail} fallidos "
+          f"({total_ok} pares coin/TF disponibles)\n")
 
     # ── Cache para workers ────────────────────────────────────────────────────
     worker_pkl = out_dir / "_wcache_v3.pkl"
@@ -1113,7 +1140,8 @@ def main():
     rng        = random.Random(42)
     start_time = time.time()
     processed  = processed_start
-    BATCH      = min(256, n_workers * 8)
+    # Batch grande = menos overhead IPC por combinación (sweet-spot empírico)
+    BATCH      = max(512, n_workers * 32)
 
     last_top_print = processed_start
     last_ckpt      = processed_start
@@ -1121,11 +1149,18 @@ def main():
     print(f"[{ts()}] Random search: {args.samples - processed_start:,} combinaciones restantes…\n")
 
     initargs = (str(worker_pkl),)
-    with mp.Pool(processes=n_workers, initializer=_worker_init, initargs=initargs) as pool:
+    with mp.Pool(processes=n_workers, initializer=_worker_init,
+                 initargs=initargs, maxtasksperchild=2000) as pool:
         while processed < args.samples:
             batch_n = min(BATCH, args.samples - processed)
             params_batch = [asdict(random_params(rng)) for _ in range(batch_n)]
-            for r in pool.map(_worker_eval, params_batch):
+            try:
+                results_batch = pool.map(_worker_eval, params_batch, chunksize=64)
+            except Exception as e:
+                print(f"\n[{ts()}] ⚠ Error en pool.map: {e} — continuando…")
+                processed += batch_n
+                continue
+            for r in results_batch:
                 _add(r)
             processed += batch_n
 
@@ -1178,11 +1213,15 @@ def main():
             for _ in range(8):
                 hc_batch.append(asdict(perturb(sp, rng)))
 
-        with mp.Pool(processes=n_workers, initializer=_worker_init, initargs=initargs) as pool:
+        with mp.Pool(processes=n_workers, initializer=_worker_init,
+                     initargs=initargs, maxtasksperchild=2000) as pool:
             for i in range(0, len(hc_batch), BATCH):
                 sub = hc_batch[i: i + BATCH]
-                for r in pool.map(_worker_eval, sub):
-                    _add(r)
+                try:
+                    for r in pool.map(_worker_eval, sub, chunksize=64):
+                        _add(r)
+                except Exception as e:
+                    print(f"\n[{ts()}] ⚠ Error HC pool.map: {e} — continuando…")
                 processed += len(sub)
 
         print(f"[{ts()}] ✓ Hill climbing completado. Total procesadas: {processed:,}")
