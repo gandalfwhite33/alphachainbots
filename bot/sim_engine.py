@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
+import random
+
 import requests
 import pandas as pd
 
@@ -32,6 +34,14 @@ INTERVAL_MS = {
 
 FALLBACK_COINS = ["BTC", "ETH", "SOL", "HYPE", "TAO", "XRP", "DOGE", "AVAX", "BNB", "LINK"]
 _HL_URL = "https://api.hyperliquid.xyz/info"
+
+MARKET_UPDATE_SEC = 300          # actualiza market data cada 5 min
+MAX_OI_HISTORY    = 48           # ~4h de historial a 5-min intervals
+LIQ_COINS         = ["BTC", "ETH", "SOL"]
+OI_COINS          = ["BTC", "ETH", "SOL", "XRP", "DOGE", "AVAX", "BNB", "LINK", "HYPE", "TAO"]
+
+_mkt_lock:  threading.Lock = threading.Lock()
+_mkt_cache: dict            = {"coins": {}, "liq": {}, "oi_hist": {}, "ts": 0}
 
 
 # ─── CONFIGURACIÓN POR ESTRATEGIA ─────────────────────────────────────────────
@@ -182,6 +192,49 @@ CONFIGS = [
 ]
 
 
+# ─── CONFIGURACIÓN BOTS LIQUIDACIONES ─────────────────────────────────────────
+@dataclass
+class LiqConfig:
+    idx:               int
+    name:              str
+    label:             str
+    strategy:          str
+    min_liq_usd:       float
+    max_dist_pct:      float
+    require_oi_grow:   bool  = False
+    require_funding_ex: bool = False
+    funding_thresh:    float = 0.001
+    min_zones:         int   = 1
+    trailing_pct:      float = 0.010
+    leverage:          float = 5.0
+    risk_per_trade:    float = 0.02
+    coins:             list  = field(default_factory=lambda: ["BTC", "ETH", "SOL"])
+
+
+LIQ_CONFIGS: list = [
+    LiqConfig(idx=18, name="bot_liq_agresivo",        label="LIQ·AGRESIVO",
+        strategy="agresivo",       min_liq_usd=5e6,   max_dist_pct=0.005),
+    LiqConfig(idx=19, name="bot_liq_moderado",        label="LIQ·MODERADO",
+        strategy="moderado",       min_liq_usd=10e6,  max_dist_pct=0.010,
+        require_oi_grow=True),
+    LiqConfig(idx=20, name="bot_liq_conservador",     label="LIQ·CONSERV",
+        strategy="conservador",    min_liq_usd=50e6,  max_dist_pct=0.020,
+        require_oi_grow=True, require_funding_ex=True, funding_thresh=0.0005),
+    LiqConfig(idx=21, name="bot_liq_funding",         label="LIQ·FUNDING",
+        strategy="funding",        min_liq_usd=1e6,   max_dist_pct=0.050,
+        require_funding_ex=True,   funding_thresh=0.001),
+    LiqConfig(idx=22, name="bot_liq_cascada",         label="LIQ·CASCADA",
+        strategy="cascada",        min_liq_usd=5e6,   max_dist_pct=0.020,
+        min_zones=3),
+    LiqConfig(idx=23, name="bot_liq_oi_divergencia",  label="LIQ·OI·DIV",
+        strategy="oi_div",         min_liq_usd=1e6,   max_dist_pct=0.050),
+    LiqConfig(idx=24, name="bot_liq_whale",           label="LIQ·WHALE",
+        strategy="whale",          min_liq_usd=100e6, max_dist_pct=0.030),
+    LiqConfig(idx=25, name="bot_liq_contratendencia", label="LIQ·CONTRA",
+        strategy="contra",         min_liq_usd=20e6,  max_dist_pct=0.050),
+]
+
+
 # ─── API REST (mainnet, sin autenticación) ────────────────────────────────────
 def _hl_post(payload: dict):
     r = requests.post(_HL_URL, json=payload, timeout=15)
@@ -229,6 +282,148 @@ def fetch_candles(coin: str, interval: str, limit: int) -> pd.DataFrame:
         df[col] = df[col].astype(float)
     df["time"] = pd.to_datetime(df["time"], unit="ms")
     return df.sort_values("time").reset_index(drop=True)
+
+
+# ─── MARKET DATA (OI, Funding, Liquidaciones) ─────────────────────────────────
+def _fetch_hl_market() -> dict:
+    """Precio, funding y OI para todos los activos de Hyperliquid."""
+    data = _hl_post({"type": "metaAndAssetCtxs"})
+    meta, ctxs = data[0], data[1]
+    result = {}
+    for i, asset in enumerate(meta["universe"]):
+        if i < len(ctxs):
+            ctx   = ctxs[i]
+            coin  = asset["name"]
+            price = float(ctx.get("markPx", 0) or 0)
+            oi    = float(ctx.get("openInterest", 0) or 0)
+            result[coin] = {
+                "price":   price,
+                "funding": float(ctx.get("funding", 0) or 0),
+                "oi":      oi,
+                "oi_usd":  round(oi * price, 0),
+                "vol_24h": float(ctx.get("dayNtlVlm", 0) or 0),
+            }
+    return result
+
+
+def _synthetic_liq_zones(coin: str, price: float) -> list:
+    """Zonas de liquidación sintéticas realistas cuando Coinglass no responde."""
+    if price <= 0:
+        price = {"BTC": 85000, "ETH": 2000, "SOL": 140}.get(coin, 500)
+    scale = {"BTC": 3e8, "ETH": 3e7, "SOL": 8e6}.get(coin, 2e6)
+    rng   = random.Random(int(price / 10) ^ hash(coin) & 0xFFFFFF)
+    zones = []
+    for lev in [5, 10, 20, 50, 100]:
+        d = 1.0 / lev * 0.85
+        for sign, ztype in [(-1, "long"), (1, "short")]:
+            zp  = price * (1 + sign * d * rng.uniform(0.8, 1.2))
+            amt = scale * rng.uniform(0.4, 2.5) / (lev / 10)
+            zones.append({"price": round(zp, 4), "liq_usd": round(amt, 0),
+                          "type": ztype, "dist_pct": 0.0})
+    for _ in range(10):
+        d = rng.uniform(-0.06, 0.06)
+        zones.append({
+            "price":   round(price * (1 + d), 4),
+            "liq_usd": round(scale * rng.uniform(0.05, 0.4) / (abs(d) * 8 + 0.5), 0),
+            "type":    "long" if d < 0 else "short",
+            "dist_pct": 0.0,
+        })
+    if price > 0:
+        for z in zones:
+            z["dist_pct"] = round((z["price"] - price) / price * 100, 2)
+    return sorted(zones, key=lambda z: z["price"])
+
+
+def _try_coinglass_liq(coin: str) -> list:
+    """Intenta obtener zonas de liquidación desde Coinglass."""
+    try:
+        url = f"https://open-api.coinglass.com/public/v2/liquidation_ex?symbol={coin}&interval=h8"
+        r   = requests.get(url, timeout=8)
+        if r.status_code == 200:
+            d = r.json()
+            if d.get("success") and d.get("data"):
+                zones = []
+                for side, ztype in [("longLiquidationData", "long"),
+                                     ("shortLiquidationData", "short")]:
+                    for item in (d["data"].get(side) or []):
+                        px  = float(item.get("priceLevel", 0) or 0)
+                        amt = float(item.get("cumSum", 0) or 0)
+                        if px > 0 and amt > 1e5:
+                            zones.append({"price": px, "liq_usd": round(amt, 0),
+                                          "type": ztype, "dist_pct": 0.0})
+                if zones:
+                    return zones
+    except Exception:
+        pass
+    return []
+
+
+def _fetch_liq_zones(coin: str, price: float) -> list:
+    zones = _try_coinglass_liq(coin) or _synthetic_liq_zones(coin, price)
+    if price > 0:
+        for z in zones:
+            z["dist_pct"] = round((z["price"] - price) / price * 100, 2)
+    return zones
+
+
+def _update_market() -> None:
+    """Hilo de fondo: actualiza market data cada MARKET_UPDATE_SEC segundos."""
+    while True:
+        try:
+            coins = _fetch_hl_market()
+            liq   = {c: _fetch_liq_zones(c, coins.get(c, {}).get("price", 0))
+                     for c in LIQ_COINS}
+            with _mkt_lock:
+                prev_hist = dict(_mkt_cache.get("oi_hist", {}))
+                for c, d in coins.items():
+                    hist = list(prev_hist.get(c, []))
+                    hist.append({"ts": time.time(), "oi": d["oi"], "price": d["price"]})
+                    prev_hist[c] = hist[-MAX_OI_HISTORY:]
+                _mkt_cache["coins"]   = coins
+                _mkt_cache["liq"]     = liq
+                _mkt_cache["oi_hist"] = prev_hist
+                _mkt_cache["ts"]      = time.time()
+        except Exception as e:
+            print(f"[market] Error actualizando: {e}")
+        time.sleep(MARKET_UPDATE_SEC)
+
+
+def get_market_state() -> dict:
+    """Devuelve datos de mercado para el endpoint /api/market."""
+    with _mkt_lock:
+        coins   = dict(_mkt_cache.get("coins", {}))
+        liq     = dict(_mkt_cache.get("liq", {}))
+        oi_hist = dict(_mkt_cache.get("oi_hist", {}))
+        ts      = _mkt_cache.get("ts", 0)
+
+    oi_table = []
+    for coin in OI_COINS:
+        d        = coins.get(coin, {})
+        price    = d.get("price", 0)
+        funding  = d.get("funding", 0)
+        oi_usd   = d.get("oi_usd", 0)
+        hist     = oi_hist.get(coin, [])
+        prev_oi_usd = hist[-2]["oi"] * hist[-2]["price"] if len(hist) >= 2 else 0
+        oi_chg   = round((oi_usd - prev_oi_usd) / prev_oi_usd * 100, 2) if prev_oi_usd > 0 else 0
+        ls_ratio = round(max(0.1, 1.0 + funding * 400), 2)
+        oi_table.append({
+            "coin":     coin,
+            "price":    price,
+            "funding":  round(funding * 100, 5),
+            "oi_usd":   oi_usd,
+            "oi_chg":   oi_chg,
+            "vol_24h":  d.get("vol_24h", 0),
+            "ls_ratio": ls_ratio,
+        })
+
+    liq_display = {}
+    for coin in LIQ_COINS:
+        zones = liq.get(coin, [])
+        price = coins.get(coin, {}).get("price", 0)
+        liq_display[coin] = {"price": price, "zones": zones[:30]}
+
+    updated = datetime.fromtimestamp(ts).strftime("%H:%M:%S") if ts else "—"
+    return {"oi_table": oi_table, "liq": liq_display, "updated_at": updated}
 
 
 # ─── INDICADORES ──────────────────────────────────────────────────────────────
@@ -590,6 +785,175 @@ class SimBot:
         }
 
 
+# ─── BOT DE LIQUIDACIONES ─────────────────────────────────────────────────────
+class LiqBot:
+    def __init__(self, cfg: LiqConfig):
+        self.cfg       = cfg
+        self.portfolio = VirtualPortfolio()
+        self.last_scan = "—"
+        self.status    = "iniciando"
+        self.errors    = 0
+        self.signals:  list[dict] = []
+        self._sig_lock = threading.Lock()
+
+    def _log_signal(self, coin: str, sig_type: str, action: str, reason: str = "") -> None:
+        entry = {
+            "time": datetime.now().strftime("%H:%M:%S"), "ts": time.time(),
+            "coin": coin, "type": sig_type, "action": action, "reason": reason,
+        }
+        with self._sig_lock:
+            self.signals.insert(0, entry)
+            if len(self.signals) > MAX_SIGNALS:
+                self.signals.pop()
+
+    # ── Filtros auxiliares ───────────────────────────────────────────────────
+    def _oi_growing(self, coin: str, cur_oi: float, oi_hist: dict) -> bool:
+        h = oi_hist.get(coin, [])
+        return len(h) < 2 or cur_oi >= h[-2]["oi"] * 0.99
+
+    # ── Lógica de señal por estrategia ──────────────────────────────────────
+    def _get_signal(self, coin: str, coins: dict, liq: dict, oi_hist: dict) -> Optional[str]:
+        cfg     = self.cfg
+        price   = coins.get(coin, {}).get("price", 0)
+        if price <= 0:
+            return None
+        zones   = liq.get(coin, [])
+        funding = coins.get(coin, {}).get("funding", 0)
+        oi      = coins.get(coin, {}).get("oi", 0)
+        sig     = None
+
+        if cfg.strategy in ("agresivo", "moderado", "conservador", "whale"):
+            # Busca la zona con mayor liquidación dentro de la distancia máxima
+            candidates = sorted(
+                [z for z in zones if z["liq_usd"] >= cfg.min_liq_usd
+                 and abs((z["price"] - price) / price) <= cfg.max_dist_pct],
+                key=lambda z: z["liq_usd"], reverse=True,
+            )
+            if candidates:
+                sig = "short" if candidates[0]["price"] < price else "long"
+
+        elif cfg.strategy == "funding":
+            if abs(funding) >= cfg.funding_thresh:
+                sig = "short" if funding > 0 else "long"
+
+        elif cfg.strategy == "cascada":
+            close = [z for z in zones
+                     if z["liq_usd"] >= cfg.min_liq_usd
+                     and abs((z["price"] - price) / price) <= cfg.max_dist_pct]
+            if len(close) >= cfg.min_zones:
+                longs_below  = sum(1 for z in close if z["price"] < price)
+                shorts_above = len(close) - longs_below
+                if longs_below > shorts_above:
+                    sig = "short"
+                elif shorts_above > longs_below:
+                    sig = "long"
+
+        elif cfg.strategy == "oi_div":
+            h = oi_hist.get(coin, [])
+            if len(h) >= 4:
+                prev      = h[-4]
+                dprice    = (price - prev["price"]) / prev["price"] if prev["price"] > 0 else 0
+                doi       = (oi - prev["oi"]) / prev["oi"] if prev["oi"] > 0 else 0
+                if dprice > 0.005 and doi < -0.01:
+                    sig = "short"
+                elif dprice < -0.005 and doi > 0.01:
+                    sig = "long"
+
+        elif cfg.strategy == "contra":
+            h = oi_hist.get(coin, [])
+            if len(h) >= 2:
+                move = (price - h[-2]["price"]) / h[-2]["price"] if h[-2]["price"] > 0 else 0
+                has_big = any(z["liq_usd"] >= cfg.min_liq_usd for z in zones)
+                if has_big:
+                    if move < -0.015:
+                        sig = "long"
+                    elif move > 0.015:
+                        sig = "short"
+
+        if sig is None:
+            return None
+        if cfg.require_oi_grow and not self._oi_growing(coin, oi, oi_hist):
+            return None
+        if cfg.require_funding_ex and abs(funding) < cfg.funding_thresh:
+            return None
+        return sig
+
+    # ── Condición de salida ──────────────────────────────────────────────────
+    def _check_exit(self, coin: str, price: float) -> Optional[str]:
+        pos = self.portfolio.positions.get(coin)
+        if not pos:
+            return None
+        if pos.trailing_stop.triggered(price):
+            return f"Trailing Stop ({pos.trailing_stop.stop:.4f})"
+        move = (price - pos.entry_price) / pos.entry_price
+        if pos.direction == "long"  and move < -0.04:
+            return "Stop adverso -4%"
+        if pos.direction == "short" and move > 0.04:
+            return "Stop adverso +4%"
+        return None
+
+    # ── Ciclo principal ──────────────────────────────────────────────────────
+    def run_cycle(self) -> None:
+        self.last_scan = datetime.now().strftime("%H:%M:%S")
+        self.status    = "escaneando"
+        with _mkt_lock:
+            coins   = dict(_mkt_cache.get("coins", {}))
+            liq     = dict(_mkt_cache.get("liq", {}))
+            oi_hist = dict(_mkt_cache.get("oi_hist", {}))
+        if not coins:
+            self.status = "esperando datos"
+            return
+        for coin in self.cfg.coins:
+            try:
+                price = coins.get(coin, {}).get("price", 0)
+                if price <= 0:
+                    continue
+                if coin in self.portfolio.positions:
+                    self.portfolio.update(coin, price)
+                    reason = self._check_exit(coin, price)
+                    if reason:
+                        pnl = self.portfolio.close(coin, reason)
+                        if pnl is not None:
+                            self._log_signal(coin, "CIERRE", f"PnL {pnl:+.2f}$", reason)
+                    continue
+                signal = self._get_signal(coin, coins, liq, oi_hist)
+                if not signal:
+                    continue
+                opened = self.portfolio.open(coin, signal, price, self.cfg)
+                if opened:
+                    self._log_signal(coin, signal.upper(), f"ENTRADA @ {price:,.4f}")
+            except Exception as e:
+                self.errors += 1
+                print(f"[{self.cfg.label}] Error {coin}: {e}")
+        self.status = "esperando"
+
+    def run(self) -> None:
+        while True:
+            self.run_cycle()
+            for _ in range(SIM_CYCLE_SEC):
+                time.sleep(1)
+
+    def to_dict(self) -> dict:
+        with self._sig_lock:
+            sigs = list(self.signals)
+        return {
+            "idx":          self.cfg.idx,
+            "label":        self.cfg.label,
+            "interval":     "liq",
+            "ma_type":      "liq",
+            "ma_fast":      0,
+            "ma_slow":      0,
+            "trailing_pct": self.cfg.trailing_pct,
+            "last_scan":    self.last_scan,
+            "status":       self.status,
+            "errors":       self.errors,
+            "coins":        self.cfg.coins,
+            "portfolio":    self.portfolio.to_dict(),
+            "signals":      sigs,
+            "strategy":     self.cfg.strategy,
+        }
+
+
 # ─── ESTADO GLOBAL ────────────────────────────────────────────────────────────
 _bots:       list[SimBot] = []
 _started     = False
@@ -627,6 +991,12 @@ def start() -> None:
         _started    = True
         _start_time = datetime.now()
 
+    # ── Hilo de market data (OI, funding, liquidaciones) ────────────────────
+    tm = threading.Thread(target=_update_market, name="market_updater", daemon=True)
+    tm.start()
+    print("[sim_engine] Market updater arrancado")
+
+    # ── Bots EMA ─────────────────────────────────────────────────────────────
     print("[sim_engine] Obteniendo top coins...")
     try:
         coins = get_top_coins()
@@ -635,7 +1005,9 @@ def start() -> None:
         coins = FALLBACK_COINS[:]
 
     print(f"[sim_engine] Coins: {', '.join(coins)}")
-    _bots = [SimBot(cfg, coins) for cfg in CONFIGS]
+    ema_bots = [SimBot(cfg, coins) for cfg in CONFIGS]
+    liq_bots = [LiqBot(cfg) for cfg in LIQ_CONFIGS]
+    _bots    = ema_bots + liq_bots
 
     for i, bot in enumerate(_bots):
         delay = i * 8

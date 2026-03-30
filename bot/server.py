@@ -99,6 +99,31 @@ tr:hover td{background:#0d1420}
 @media(max-width:900px){.grid3{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:580px){.grid3{grid-template-columns:1fr}}
 @media(max-width:580px){.hdr{flex-direction:column;align-items:flex-start}.hdr-stats{gap:12px}}
+
+/* ── MARKET DATA ── */
+.mkt-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+@media(max-width:900px){.mkt-grid{grid-template-columns:1fr}}
+.mkt-upd{font-size:10px;color:#37505f}
+/* Heatmap */
+.hmap-wrap{display:flex;gap:10px;flex-wrap:wrap}
+.hmap-coin{flex:1;min-width:180px}
+.hmap-title{font-size:11px;font-weight:bold;margin-bottom:6px;letter-spacing:1px}
+.hmap-body{position:relative;height:240px;overflow-y:auto;border:1px solid #0d1520;border-radius:4px}
+.hmap-row{display:flex;align-items:center;gap:6px;padding:2px 6px;font-size:10px;border-bottom:1px solid #080e18;cursor:default}
+.hmap-row:hover{background:#0d1420}
+.hmap-price{width:72px;text-align:right;color:#c9d4e0;flex-shrink:0}
+.hmap-bar-wrap{flex:1;height:12px;background:#0a0f1c;border-radius:2px;overflow:hidden}
+.hmap-bar{height:100%;border-radius:2px;transition:width .4s}
+.hmap-bar.long{background:#1a4a2e}
+.hmap-bar.short{background:#3a1020}
+.hmap-bar.long.big{background:#00c853}
+.hmap-bar.short.big{background:#ff1744}
+.hmap-amt{width:60px;text-align:right;color:#546e7a;flex-shrink:0}
+.hmap-cur{background:#1a2a3a!important;border-left:3px solid #4fc3f7}
+/* OI/Funding table */
+.oi-pos{color:#00e676}.oi-neg{color:#ff4466}.oi-nu{color:#78909c}
+.fund-pos{color:#00e676;font-weight:bold}.fund-neg{color:#ff4466;font-weight:bold}.fund-nu{color:#546e7a}
+.ls-bull{color:#69f0ae}.ls-bear{color:#ff6b6b}
 </style>
 </head>
 <body>
@@ -111,6 +136,43 @@ tr:hover td{background:#0d1420}
 </div>
 
 <div class="wrap">
+
+  <!-- ── MARKET DATA SECTION ─────────────────────────────────────────────── -->
+  <div class="mkt-grid">
+
+    <!-- Liquidation Heatmap -->
+    <div class="panel">
+      <div class="ph">
+        <span>Liquidation Heatmap — BTC / ETH / SOL</span>
+        <span class="mkt-upd">5 min &middot; <span id="mkt-cd">—</span> &middot; <span id="mkt-upd-ts">—</span></span>
+      </div>
+      <div style="padding:10px">
+        <div class="hmap-wrap" id="hmap-wrap">
+          <div class="hmap-coin"><div class="hmap-title col0">BTC</div><div class="hmap-body" id="hmap-BTC"><div class="empty">Cargando&hellip;</div></div></div>
+          <div class="hmap-coin"><div class="hmap-title col1">ETH</div><div class="hmap-body" id="hmap-ETH"><div class="empty">Cargando&hellip;</div></div></div>
+          <div class="hmap-coin"><div class="hmap-title col2">SOL</div><div class="hmap-body" id="hmap-SOL"><div class="empty">Cargando&hellip;</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OI + Funding + L/S Table -->
+    <div class="panel">
+      <div class="ph"><span>Open Interest &middot; Funding Rate &middot; L/S Ratio</span></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>Coin</th><th>Precio</th>
+            <th>OI (USD)</th><th>OI Chg 5m</th>
+            <th>Funding %</th><th>L/S</th><th>Vol 24h</th>
+          </tr></thead>
+          <tbody id="oi-body"><tr><td colspan="7" class="empty">Cargando&hellip;</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+  <!-- ── FIN MARKET DATA ─────────────────────────────────────────────────── -->
+
   <div class="grid3" id="bot-cards">
     <div class="card c0"><div class="card-name col0">BOT&middot;4H</div><div class="card-meta">Cargando&hellip;</div></div>
     <div class="card c1"><div class="card-name col1">BOT&middot;1H&middot;EMA</div><div class="card-meta">Cargando&hellip;</div></div>
@@ -174,7 +236,8 @@ function render(d){
   // Bot cards
   document.getElementById('bot-cards').innerHTML=d.bots.map((b,i)=>{
     const p=b.portfolio, cc=COLS[b.idx%18], cv=CARDS[b.idx%18];
-    const ma=(b.ma_type==='ema'?'EMA':'SMA')+` ${b.ma_fast}/${b.ma_slow}`;
+    const ma=b.ma_type==='liq'?`LIQ·${b.strategy||''}`.toUpperCase()
+             :(b.ma_type==='ema'?'EMA':'SMA')+` ${b.ma_fast}/${b.ma_slow}`;
     const tr=(b.trailing_pct*100).toFixed(1);
     const wr=p.trades>0?`${p.wins}/${p.trades} wins`:'0 trades';
     const pc2=pc(p.total_pnl);
@@ -285,7 +348,100 @@ function fetchData(){
     .catch(()=>startCD());
 }
 
+// ── MARKET DATA ──────────────────────────────────────────────────────────────
+const MKT_REFRESH = 300;
+let mktCd = MKT_REFRESH, mktTimer;
+
+function fmtM(v){
+  if(v>=1e9) return '$'+(v/1e9).toFixed(2)+'B';
+  if(v>=1e6) return '$'+(v/1e6).toFixed(1)+'M';
+  if(v>=1e3) return '$'+(v/1e3).toFixed(0)+'K';
+  return '$'+v.toFixed(0);
+}
+
+function renderHeatmap(coin, data){
+  const el = document.getElementById('hmap-'+coin);
+  if(!el) return;
+  const zones = data.zones || [];
+  const price = data.price || 0;
+  if(!zones.length){ el.innerHTML='<div class="empty">Sin datos</div>'; return; }
+  const maxLiq = Math.max(...zones.map(z=>z.liq_usd));
+  // Sort descending by price to show price scale top→bottom
+  const sorted = [...zones].sort((a,b)=>b.price-a.price);
+  // Find index closest to current price
+  let curIdx = sorted.findIndex(z=>z.price<=price);
+  if(curIdx<0) curIdx = sorted.length-1;
+  el.innerHTML = sorted.map((z,i)=>{
+    const barW  = maxLiq>0 ? Math.round(z.liq_usd/maxLiq*100) : 0;
+    const isBig = z.liq_usd >= maxLiq*0.3;
+    const isCur = Math.abs(i-curIdx)<=1;
+    const cls   = z.type==='long'?(isBig?'long big':'long'):(isBig?'short big':'short');
+    const pxStr = price>=1000? fmtPx(z.price) : fmtPx(z.price);
+    const amtStr = fmtM(z.liq_usd);
+    const distCls = z.type==='long'?'dn':'up';
+    return `<div class="hmap-row${isCur?' hmap-cur':''}">
+      <span class="hmap-price">${pxStr}</span>
+      <div class="hmap-bar-wrap"><div class="hmap-bar ${cls}" style="width:${barW}%"></div></div>
+      <span class="hmap-amt ${distCls}">${amtStr}</span>
+    </div>`;
+  }).join('');
+  // Scroll to current price
+  if(curIdx>=0){
+    const rows = el.querySelectorAll('.hmap-row');
+    if(rows[curIdx]) rows[curIdx].scrollIntoView({block:'center',behavior:'smooth'});
+  }
+}
+
+function renderOI(rows){
+  const el = document.getElementById('oi-body');
+  if(!el) return;
+  if(!rows||!rows.length){ el.innerHTML='<tr><td colspan="7" class="empty">Sin datos</td></tr>'; return; }
+  el.innerHTML = rows.map(r=>{
+    const fCls = r.funding>0?'fund-pos':r.funding<0?'fund-neg':'fund-nu';
+    const oCls = r.oi_chg>0?'oi-pos':r.oi_chg<0?'oi-neg':'oi-nu';
+    const lsCls = r.ls_ratio>1.05?'ls-bull':r.ls_ratio<0.95?'ls-bear':'';
+    return `<tr>
+      <td><b>${r.coin}</b></td>
+      <td>$${fmtPx(r.price)}</td>
+      <td>${fmtM(r.oi_usd)}</td>
+      <td class="${oCls}">${r.oi_chg>=0?'+':''}${r.oi_chg}%</td>
+      <td class="${fCls}">${r.funding>=0?'+':''}${r.funding.toFixed(4)}%</td>
+      <td class="${lsCls}">${r.ls_ratio.toFixed(2)}</td>
+      <td>${fmtM(r.vol_24h)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderMarket(d){
+  if(d.oi_table) renderOI(d.oi_table);
+  if(d.liq){
+    for(const coin of ['BTC','ETH','SOL']){
+      if(d.liq[coin]) renderHeatmap(coin, d.liq[coin]);
+    }
+  }
+  if(d.updated_at) document.getElementById('mkt-upd-ts').textContent=d.updated_at;
+}
+
+function startMktCD(){
+  clearInterval(mktTimer);
+  mktCd = MKT_REFRESH;
+  mktTimer = setInterval(()=>{
+    mktCd--;
+    const el = document.getElementById('mkt-cd');
+    if(el) el.textContent = mktCd+'s';
+    if(mktCd<=0){ clearInterval(mktTimer); fetchMarket(); }
+  },1000);
+}
+
+function fetchMarket(){
+  fetch('/api/market')
+    .then(r=>r.json())
+    .then(data=>{renderMarket(data);startMktCD();})
+    .catch(()=>startMktCD());
+}
+
 fetchData();
+fetchMarket();
 </script>
 </body>
 </html>"""
@@ -303,6 +459,14 @@ class DashHandler(BaseHTTPRequestHandler):
         elif path == "/api/status":
             try:
                 data = sim_engine.get_state()
+                body = json.dumps(data).encode()
+            except Exception as e:
+                body = json.dumps({"error": str(e)}).encode()
+            self._respond(200, "application/json", body)
+
+        elif path == "/api/market":
+            try:
+                data = sim_engine.get_market_state()
                 body = json.dumps(data).encode()
             except Exception as e:
                 body = json.dumps({"error": str(e)}).encode()
