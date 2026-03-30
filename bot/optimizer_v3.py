@@ -279,272 +279,249 @@ def _atr(high: np.ndarray, low: np.ndarray, close: np.ndarray, n: int = 14) -> n
     return out
 
 
-# ─── FILTRO HORARIO ───────────────────────────────────────────────────────────
-_LONDON_NY = set(range(7, 22))   # UTC 7-21
-_ASIA      = set(range(0, 9))    # UTC 0-8
+# ─── UTILIDADES DE PRE-CÓMPUTO ────────────────────────────────────────────────
+_LONDON_NY = set(range(7, 22))
+_ASIA      = set(range(0, 9))
 
 
-def _ok_hour(ts_ms: float, filt: str) -> bool:
-    if filt == "none":
-        return True
-    h = datetime.utcfromtimestamp(ts_ms / 1000).hour
-    return h in (_LONDON_NY if filt == "london_ny" else _ASIA)
+def _hour_mask(ts_arr: np.ndarray, allowed: set) -> np.ndarray:
+    """Máscara booleana: True si la hora UTC de esa vela está en `allowed`."""
+    hours = (ts_arr // 3_600_000 % 24).astype(np.int32)
+    mask  = np.zeros(len(ts_arr), dtype=bool)
+    for h in allowed:
+        mask |= (hours == h)
+    return mask
 
 
-# ─── SIMULACIÓN ───────────────────────────────────────────────────────────────
-_FIBO = [0.236, 0.382, 0.500, 0.618, 0.786]
+def _roll_max(arr: np.ndarray, w: int) -> np.ndarray:
+    """Rolling max de ventana w — vectorizado con stride tricks."""
+    out = np.full_like(arr, np.nan)
+    if len(arr) < w:
+        return out
+    shape   = arr.shape[:-1] + (arr.shape[-1] - w + 1, w)
+    strides = arr.strides + (arr.strides[-1],)
+    windows = np.lib.stride_tricks.as_strided(arr, shape=shape, strides=strides)
+    out[w - 1:] = windows.max(axis=1)
+    return out
 
 
-def _near_fibo(price: float, hi: float, lo: float, pct: float = 0.015) -> bool:
+def _roll_min(arr: np.ndarray, w: int) -> np.ndarray:
+    out = np.full_like(arr, np.nan)
+    if len(arr) < w:
+        return out
+    shape   = arr.shape[:-1] + (arr.shape[-1] - w + 1, w)
+    strides = arr.strides + (arr.strides[-1],)
+    windows = np.lib.stride_tricks.as_strided(arr, shape=shape, strides=strides)
+    out[w - 1:] = windows.min(axis=1)
+    return out
+
+
+# ─── FIBONACCI ────────────────────────────────────────────────────────────────
+_FIBO_L = np.array([0.236, 0.382, 0.500, 0.618, 0.786])
+
+
+def _near_fibo_fast(price: float, hi: float, lo: float) -> bool:
     rng = hi - lo
-    if rng <= 0:
+    if rng <= 0 or price <= 0:
         return False
-    return any(abs(price - (lo + rng * f)) / price <= pct for f in _FIBO)
+    levels = lo + rng * _FIBO_L
+    return bool(np.any(np.abs(levels - price) / price <= 0.015))
 
 
-def _simulate(params: OptParams, candles_by_coin: Dict[str, np.ndarray]) -> dict:
-    """Simula la combinación sobre todas las monedas del timeframe dado."""
-    all_pnl      = 0.0
-    all_trades   = 0
-    all_wins     = 0
-    gross_win    = 0.0
-    gross_loss   = 0.0
-    all_best     = 0.0
-    all_worst    = 0.0
-    equity       = INITIAL_EQUITY
-    peak_equity  = INITIAL_EQUITY
-    max_dd       = 0.0
-    equity_curve = [INITIAL_EQUITY]
+# ─── SIMULACIÓN FAST (usa indicadores pre-computados) ────────────────────────
+def _simulate_fast(params: OptParams, coins_ind: Dict[str, dict]) -> dict:
+    """Simula usando indicadores pre-computados — sin recalcular nada por eval."""
+    all_pnl     = 0.0
+    all_trades  = 0
+    all_wins    = 0
+    gross_win   = 0.0
+    gross_loss  = 0.0
+    all_best    = 0.0
+    all_worst   = 0.0
+    equity      = INITIAL_EQUITY
+    peak_equity = INITIAL_EQUITY
+    max_dd      = 0.0
+    eq_curve    = [INITIAL_EQUITY]
 
-    min_bars = max(params.ma_slow + 20, 220)
+    min_bars  = max(params.ma_slow + 20, 220)
+    ma_key    = f"{params.ma_type}_{params.ma_fast}_{params.ma_slow}"
+    sl_type   = params.sl_type
+    fib_mode  = params.fib_mode
+    rsi_filt  = params.rsi_filter
+    e200_filt = params.ema200_filter
+    atr_filt  = params.atr_filter
+    vol_prof  = params.vol_profile
+    time_filt = params.time_filter
+    trailing  = params.trailing_pct
+    compound  = params.compound
+    tp_fib    = params.tp_fib
+    risk_lev  = params.risk_pct * params.leverage
 
-    for coin, arr in candles_by_coin.items():
-        if arr is None or len(arr) < min_bars + 10:
+    for coin, ind in coins_ind.items():
+        closes  = ind.get("closes")
+        if closes is None or len(closes) < min_bars + 10:
             continue
 
-        ts_arr  = arr[:, 0]
-        highs   = arr[:, 2]
-        lows    = arr[:, 3]
-        closes  = arr[:, 4]
-        volumes = arr[:, 5]
+        maf = ind.get(f"maf_{ma_key}")
+        mas = ind.get(f"mas_{ma_key}")
+        if maf is None or mas is None:
+            continue
 
-        # MAs
-        if params.ma_type == "ema":
-            maf = _ema(closes, params.ma_fast)
-            mas = _ema(closes, params.ma_slow)
+        ema200      = ind["ema200"]
+        rsi14       = ind["rsi14"]
+        atr14       = ind["atr14"]
+        vol_ma      = ind["vol_ma"]
+        highs       = ind["highs"]
+        lows        = ind["lows"]
+        volumes     = ind["volumes"]
+        roll_hi     = ind["roll_hi"]
+        roll_lo     = ind["roll_lo"]
+        atr_pct_ref = ind["atr_pct_ref"]
+        price_mean  = ind["price_mean"]
+        N           = len(closes)
+
+        if time_filt == "london_ny":
+            hour_ok = ind["h_london"]
+        elif time_filt == "asia":
+            hour_ok = ind["h_asia"]
         else:
-            maf = _sma(closes, params.ma_fast)
-            mas = _sma(closes, params.ma_slow)
-
-        ema200 = _ema(closes, 200)
-        rsi    = _rsi(closes, 14)
-        atr    = _atr(highs, lows, closes, 14)
-        vol_ma = _sma(volumes, 20)
-
-        # ATR medio como referencia relativa
-        atr_valid = atr[~np.isnan(atr)]
-        price_mean = float(np.nanmean(closes))
-        atr_mean   = float(np.mean(atr_valid)) if len(atr_valid) > 0 else 0.0
-        atr_pct_ref = atr_mean / price_mean if price_mean > 0 else 0.0
+            hour_ok = None
 
         coin_equity = INITIAL_EQUITY
-        # position: (direction, entry, stop, tp)
-        position = None
+        position    = None  # (direction, entry, stop, tp)
 
-        for i in range(min_bars, len(closes) - 1):
+        for i in range(min_bars, N - 1):
             price = closes[i]
-            if price <= 0:
-                continue
 
-            # ── Gestión de posición existente ────────────────────────────────
+            # ── Gestión posición existente ────────────────────────────────────
             if position is not None:
                 direction, entry, stop, tp = position
 
-                # Actualizar trailing / ATR stop
-                if params.sl_type == "trailing":
+                if sl_type == "trailing":
                     if direction == "long":
-                        new_s = price * (1 - params.trailing_pct)
-                        if new_s > stop:
-                            stop = new_s
+                        ns = price * (1.0 - trailing)
+                        if ns > stop: stop = ns
                     else:
-                        new_s = price * (1 + params.trailing_pct)
-                        if new_s < stop:
-                            stop = new_s
+                        ns = price * (1.0 + trailing)
+                        if ns < stop: stop = ns
                     position = (direction, entry, stop, tp)
-
-                elif params.sl_type == "atr":
-                    av = atr[i]
-                    if not np.isnan(av) and av > 0:
+                elif sl_type == "atr":
+                    av = atr14[i]
+                    if av == av:   # not NaN
                         if direction == "long":
-                            new_s = price - 2.0 * av
-                            if new_s > stop:
-                                stop = new_s
+                            ns = price - 2.0 * av
+                            if ns > stop: stop = ns
                         else:
-                            new_s = price + 2.0 * av
-                            if new_s < stop:
-                                stop = new_s
+                            ns = price + 2.0 * av
+                            if ns < stop: stop = ns
                         position = (direction, entry, stop, tp)
 
-                # Detectar salida
                 exit_now = False
                 if direction == "long":
-                    if price <= stop:
-                        exit_now = True
-                    elif tp is not None and price >= tp:
-                        exit_now = True
+                    exit_now = price <= stop or (tp is not None and price >= tp)
                 else:
-                    if price >= stop:
-                        exit_now = True
-                    elif tp is not None and price <= tp:
-                        exit_now = True
+                    exit_now = price >= stop or (tp is not None and price <= tp)
 
-                # Cruce MA inverso
-                if not exit_now and i >= 2:
-                    pf2, ps2 = maf[i - 1], mas[i - 1]
-                    cf2, cs2 = maf[i],     mas[i]
-                    if not any(np.isnan(x) for x in [pf2, ps2, cf2, cs2]):
-                        if direction == "long"  and pf2 >= ps2 and cf2 < cs2:
-                            exit_now = True
-                        elif direction == "short" and pf2 <= ps2 and cf2 > cs2:
-                            exit_now = True
+                if not exit_now:
+                    pf1 = maf[i-1]; ps1 = mas[i-1]; cf1 = maf[i]; cs1 = mas[i]
+                    if pf1==pf1 and ps1==ps1 and cf1==cf1 and cs1==cs1:
+                        if direction == "long"  and pf1 >= ps1 and cf1 < cs1: exit_now = True
+                        elif direction == "short" and pf1 <= ps1 and cf1 > cs1: exit_now = True
 
                 if exit_now:
-                    notional = coin_equity * params.risk_pct * params.leverage
-                    size     = notional / entry
-                    pnl = size * (price - entry) if direction == "long" else size * (entry - price)
-
-                    if params.compound:
-                        coin_equity = max(coin_equity + pnl, 1.0)
-
+                    size = coin_equity * risk_lev / entry
+                    pnl  = size * (price - entry) if direction == "long" else size * (entry - price)
+                    if compound: coin_equity = max(coin_equity + pnl, 1.0)
                     all_pnl    += pnl
                     all_trades += 1
-                    if pnl > 0:
-                        all_wins += 1
-                        gross_win += pnl
-                    else:
-                        gross_loss += abs(pnl)
-                    if pnl > all_best:
-                        all_best = pnl
-                    if pnl < all_worst:
-                        all_worst = pnl
-
+                    if pnl > 0:  all_wins += 1; gross_win  += pnl
+                    else:        gross_loss += -pnl
+                    if pnl > all_best:  all_best  = pnl
+                    if pnl < all_worst: all_worst = pnl
                     equity += pnl
                     if equity > peak_equity:
                         peak_equity = equity
                     elif peak_equity > 0:
                         dd = (peak_equity - equity) / peak_equity * 100.0
-                        if dd > max_dd:
-                            max_dd = dd
-
-                    equity_curve.append(equity)
+                        if dd > max_dd: max_dd = dd
+                    eq_curve.append(equity)
                     position = None
                     continue
 
-            # ── Sin posición: buscar entrada ──────────────────────────────────
-            if position is not None:
+            # ── Búsqueda de entrada ───────────────────────────────────────────
+            pf1 = maf[i-1]; ps1 = mas[i-1]; cf1 = maf[i]; cs1 = mas[i]
+            if not (pf1==pf1 and ps1==ps1 and cf1==cf1 and cs1==cs1):
                 continue
+            if   pf1 < ps1 and cf1 > cs1: signal = "long"
+            elif pf1 > ps1 and cf1 < cs1: signal = "short"
+            else: continue
 
-            # Señal cruce MA
-            if i < 2:
-                continue
-            pf1, ps1 = maf[i - 1], mas[i - 1]
-            cf1, cs1 = maf[i],     mas[i]
-            if any(np.isnan(x) for x in [pf1, ps1, cf1, cs1]):
-                continue
+            if hour_ok is not None and not hour_ok[i]: continue
 
-            signal = None
-            if pf1 < ps1 and cf1 > cs1:
-                signal = "long"
-            elif pf1 > ps1 and cf1 < cs1:
-                signal = "short"
-            if signal is None:
-                continue
+            if e200_filt != "none":
+                e200 = ema200[i]
+                if e200 == e200 and e200 > 0:
+                    if e200_filt == "soft":
+                        if signal == "long"  and price < e200 * 0.98: continue
+                        if signal == "short" and price > e200 * 1.02: continue
+                    else:
+                        if signal == "long"  and price <= e200: continue
+                        if signal == "short" and price >= e200: continue
 
-            # Filtro horario
-            if not _ok_hour(ts_arr[i], params.time_filter):
-                continue
+            if rsi_filt != "none":
+                rv = rsi14[i]
+                if rv == rv:
+                    if rsi_filt == "rsi50":
+                        if signal == "long"  and rv <= 50.0: continue
+                        if signal == "short" and rv >= 50.0: continue
+                    else:
+                        if signal == "long"  and rv <= 55.0: continue
+                        if signal == "short" and rv >= 45.0: continue
 
-            # Filtro EMA200
-            e200 = ema200[i]
-            if not np.isnan(e200) and e200 > 0:
-                if params.ema200_filter == "soft":
-                    if signal == "long"  and price < e200 * 0.98:
-                        continue
-                    if signal == "short" and price > e200 * 1.02:
-                        continue
-                elif params.ema200_filter == "strict":
-                    if signal == "long"  and price <= e200:
-                        continue
-                    if signal == "short" and price >= e200:
-                        continue
+            if atr_filt != "none" and atr_pct_ref > 0:
+                av = atr14[i]
+                if av == av:
+                    apt = av / price_mean
+                    if atr_filt == "min" and apt < atr_pct_ref * 0.5: continue
+                    if atr_filt == "max" and apt > atr_pct_ref * 1.8: continue
 
-            # Filtro RSI
-            rv = rsi[i]
-            if not np.isnan(rv):
-                if params.rsi_filter == "rsi50":
-                    if signal == "long"  and rv <= 50.0:
-                        continue
-                    if signal == "short" and rv >= 50.0:
-                        continue
-                elif params.rsi_filter == "rsi55":
-                    if signal == "long"  and rv <= 55.0:
-                        continue
-                    if signal == "short" and rv >= 45.0:
+            if fib_mode != "disabled":
+                hi_sw = roll_hi[i]; lo_sw = roll_lo[i]
+                if hi_sw == hi_sw and lo_sw == lo_sw:
+                    if fib_mode == "required" and not _near_fibo_fast(price, hi_sw, lo_sw):
                         continue
 
-            # Filtro ATR
-            av = atr[i]
-            if not np.isnan(av) and atr_pct_ref > 0:
-                atr_pct_now = av / price_mean
-                if params.atr_filter == "min" and atr_pct_now < atr_pct_ref * 0.5:
-                    continue
-                if params.atr_filter == "max" and atr_pct_now > atr_pct_ref * 1.8:
-                    continue
+            if vol_prof != "disabled":
+                vm = vol_ma[i]
+                if vm == vm and vm > 0:
+                    vn = volumes[i]
+                    if vol_prof == "strict"  and vn < vm * 1.5: continue
+                    if vol_prof == "relaxed" and vn < vm * 0.7: continue
 
-            # Filtro Fibonacci
-            if params.fib_mode != "disabled":
-                lookback = min(i, 60)
-                hi_sw = float(np.max(highs[i - lookback: i]))
-                lo_sw = float(np.min(lows[i - lookback: i]))
-                near  = _near_fibo(price, hi_sw, lo_sw, 0.015)
-                if params.fib_mode == "required" and not near:
-                    continue
-
-            # Filtro volumen
-            vm = vol_ma[i]
-            if not np.isnan(vm) and vm > 0:
-                vol_now = volumes[i]
-                if params.vol_profile == "strict"  and vol_now < vm * 1.5:
-                    continue
-                if params.vol_profile == "relaxed" and vol_now < vm * 0.7:
-                    continue
-
-            # Calcular stop
-            entry = price
-            av_now = float(atr[i]) if not np.isnan(atr[i]) else entry * 0.01
-
-            if params.sl_type == "fixed":
-                sp = params.trailing_pct * 2.0
-                stop = entry * (1 - sp) if signal == "long" else entry * (1 + sp)
-            elif params.sl_type == "trailing":
-                stop = entry * (1 - params.trailing_pct) if signal == "long" else entry * (1 + params.trailing_pct)
-            else:  # atr
+            entry  = price
+            av_now = atr14[i] if atr14[i] == atr14[i] else entry * 0.01
+            if sl_type == "fixed":
+                sp   = trailing * 2.0
+                stop = entry * (1.0 - sp) if signal == "long" else entry * (1.0 + sp)
+            elif sl_type == "trailing":
+                stop = entry * (1.0 - trailing) if signal == "long" else entry * (1.0 + trailing)
+            else:
                 stop = (entry - 2.0 * av_now) if signal == "long" else (entry + 2.0 * av_now)
 
-            # Take profit fibonacci
             tp = None
-            if params.tp_fib:
-                lookback = min(i, 60)
-                hi_sw = float(np.max(highs[i - lookback: i]))
-                lo_sw = float(np.min(lows[i - lookback: i]))
-                rng_sw = hi_sw - lo_sw
-                if rng_sw > 0:
-                    if signal == "long":
-                        candidates = [lo_sw + rng_sw * f for f in [0.618, 0.786, 1.0] if lo_sw + rng_sw * f > entry]
-                        tp = min(candidates) if candidates else None
-                    else:
-                        candidates = [lo_sw + rng_sw * f for f in [0.0, 0.236, 0.382] if lo_sw + rng_sw * f < entry]
-                        tp = max(candidates) if candidates else None
+            if tp_fib:
+                hi_sw = roll_hi[i]; lo_sw = roll_lo[i]
+                if hi_sw == hi_sw and lo_sw == lo_sw:
+                    rng_sw = hi_sw - lo_sw
+                    if rng_sw > 0:
+                        if signal == "long":
+                            cands = [lo_sw + rng_sw * f for f in (0.618, 0.786, 1.0)
+                                     if lo_sw + rng_sw * f > entry]
+                            tp = min(cands) if cands else None
+                        else:
+                            cands = [lo_sw + rng_sw * f for f in (0.0, 0.236, 0.382)
+                                     if lo_sw + rng_sw * f < entry]
+                            tp = max(cands) if cands else None
 
             position = (signal, entry, stop, tp)
 
@@ -559,8 +536,8 @@ def _simulate(params: OptParams, candles_by_coin: Dict[str, np.ndarray]) -> dict
     win_rate      = all_wins / all_trades * 100.0
     total_pnl_pct = all_pnl / INITIAL_EQUITY * 100.0
 
-    if len(equity_curve) > 2:
-        eq_arr  = np.array(equity_curve)
+    if len(eq_curve) > 2:
+        eq_arr  = np.array(eq_curve)
         returns = np.diff(eq_arr) / np.where(eq_arr[:-1] > 0, eq_arr[:-1], 1.0)
         std_r   = float(np.std(returns))
         sharpe  = float(np.mean(returns)) / std_r * np.sqrt(252) if std_r > 0 else 0.0
@@ -583,32 +560,119 @@ def _simulate(params: OptParams, candles_by_coin: Dict[str, np.ndarray]) -> dict
 
 
 # ─── WORKER (multiprocessing) ─────────────────────────────────────────────────
-_worker_cache: Dict[str, Dict[str, np.ndarray]] = {}
+# Cada worker pre-computa TODOS los indicadores al iniciar.
+# Así la evaluación de cada combinación sólo hace el loop de simulación,
+# sin recalcular EMA/SMA/RSI/ATR en cada llamada.
+_worker_ind: Dict[str, Dict[str, dict]] = {}   # [interval][coin] → {arrays pre-computados}
 
 
 def _worker_init(cache_pkl: str):
-    global _worker_cache
+    global _worker_ind
     try:
         with open(cache_pkl, "rb") as f:
-            _worker_cache = pickle.load(f)
+            raw: Dict[str, Dict[str, np.ndarray]] = pickle.load(f)
     except Exception:
-        _worker_cache = {}
+        _worker_ind = {}
+        return
+
+    _worker_ind = {}
+    for tf, coins_dict in raw.items():
+        _worker_ind[tf] = {}
+        for coin, arr in coins_dict.items():
+            if arr is None or len(arr) < 250:
+                continue
+            ts_col  = arr[:, 0]
+            highs   = arr[:, 2]
+            lows    = arr[:, 3]
+            closes  = arr[:, 4]
+            volumes = arr[:, 5]
+
+            ind: dict = {
+                "ts":      ts_col,
+                "closes":  closes,
+                "highs":   highs,
+                "lows":    lows,
+                "volumes": volumes,
+                "ema200":  _ema(closes, 200),
+                "rsi14":   _rsi(closes, 14),
+                "atr14":   _atr(highs, lows, closes, 14),
+                "vol_ma":  _sma(volumes, 20),
+                # rolling 60-bar max/min para Fibonacci (pre-computado)
+                "roll_hi": _roll_max(highs, 60),
+                "roll_lo": _roll_min(lows, 60),
+                # hour mask por filtro (índice booleano)
+                "h_london": _hour_mask(ts_col, _LONDON_NY),
+                "h_asia":   _hour_mask(ts_col, _ASIA),
+            }
+            # Pre-computar las 6 variantes de MA (solo cambia ma_fast/ma_slow)
+            for (ma_type, fast, slow) in MA_PAIRS:
+                k = f"{ma_type}_{fast}_{slow}"
+                if ma_type == "ema":
+                    ind[f"maf_{k}"] = _ema(closes, fast)
+                    ind[f"mas_{k}"] = _ema(closes, slow)
+                else:
+                    ind[f"maf_{k}"] = _sma(closes, fast)
+                    ind[f"mas_{k}"] = _sma(closes, slow)
+
+            # Referencia ATR% para filtro ATR
+            atr_valid = ind["atr14"][~np.isnan(ind["atr14"])]
+            price_mean = float(np.mean(closes)) if len(closes) > 0 else 1.0
+            ind["atr_pct_ref"] = (float(np.mean(atr_valid)) / price_mean
+                                  if len(atr_valid) > 0 and price_mean > 0 else 0.0)
+            ind["price_mean"] = price_mean
+
+            _worker_ind[tf][coin] = ind
 
 
-def _worker_eval(params_dict: dict) -> dict:
-    try:
-        params = OptParams(**params_dict)
-        coins_for_tf = _worker_cache.get(params.interval, {})
-        if not coins_for_tf:
-            return {}
-        metrics = _simulate(params, coins_for_tf)
+def _worker_run_segment(task: dict) -> List[dict]:
+    """
+    Genera `n` combinaciones aleatorias, las simula y devuelve los resultados.
+    El worker usa sus propios indicadores pre-computados.
+    Sin IPC por combinación — todo el trabajo ocurre dentro del worker.
+    """
+    n    = task["n"]
+    seed = task["seed"]
+    rng  = random.Random(seed)
+    results: List[dict] = []
+
+    for _ in range(n):
+        params = random_params(rng)
+        coins_ind = _worker_ind.get(params.interval)
+        if not coins_ind:
+            continue
+        metrics = _simulate_fast(params, coins_ind)
         if metrics["total_trades"] == 0:
-            return {}
-        result = asdict(params)
-        result.update(metrics)
-        return result
-    except Exception:
-        return {}
+            continue
+        r = asdict(params)
+        r.update(metrics)
+        results.append(r)
+
+    return results
+
+
+def _worker_ping(_) -> bool:
+    """Función trivial picklable — se usa para verificar que el Pool arranca."""
+    return True
+
+
+def _worker_run_hc_segment(task: dict) -> List[dict]:
+    """Evalúa una lista de params pre-generados (hill climbing)."""
+    results: List[dict] = []
+    for pd in task.get("params", []):
+        try:
+            params = OptParams(**pd)
+            coins_ind = _worker_ind.get(params.interval)
+            if not coins_ind:
+                continue
+            metrics = _simulate_fast(params, coins_ind)
+            if metrics["total_trades"] == 0:
+                continue
+            r = asdict(params)
+            r.update(metrics)
+            results.append(r)
+        except Exception:
+            continue
+    return results
 
 
 # ─── CHECKPOINT ───────────────────────────────────────────────────────────────
@@ -1122,6 +1186,15 @@ def main():
     with open(worker_pkl, "wb") as f:
         pickle.dump(candles, f)
 
+    # ── Test de arranque del Pool ─────────────────────────────────────────────
+    n_sys_cores = os.cpu_count() or 1
+    print(f"[{ts()}] CPUs del sistema: {n_sys_cores} — usando {n_workers} workers")
+    print(f"[{ts()}] Iniciando Pool de multiprocessing…", end=" ", flush=True)
+    with mp.Pool(processes=n_workers, initializer=_worker_init,
+                 initargs=(str(worker_pkl),)) as _tp:
+        _tp.map(_worker_ping, range(n_workers))
+    print(f"✓ {n_workers} workers listos\n")
+
     # ── Helper para añadir resultado ──────────────────────────────────────────
     def _add(r: dict):
         if not r or r.get("total_trades", 0) == 0:
@@ -1140,29 +1213,36 @@ def main():
     rng        = random.Random(42)
     start_time = time.time()
     processed  = processed_start
-    # Batch grande = menos overhead IPC por combinación (sweet-spot empírico)
-    BATCH      = max(512, n_workers * 32)
+    # Cada worker recibe un segmento grande y genera sus propios params internamente.
+    # Así la IPC es O(1) por ronda, no O(n) por combinación.
+    SEG_SIZE   = 4_000   # combos por worker por ronda
 
     last_top_print = processed_start
     last_ckpt      = processed_start
 
-    print(f"[{ts()}] Random search: {args.samples - processed_start:,} combinaciones restantes…\n")
+    print(f"[{ts()}] Random search: {args.samples - processed_start:,} combinaciones restantes…")
+    print(f"[{ts()}] Estrategia: {n_workers} workers × {SEG_SIZE:,} combos/seg = "
+          f"{n_workers * SEG_SIZE:,} combos/ronda\n")
 
     initargs = (str(worker_pkl),)
     with mp.Pool(processes=n_workers, initializer=_worker_init,
-                 initargs=initargs, maxtasksperchild=2000) as pool:
+                 initargs=initargs, maxtasksperchild=500) as pool:
         while processed < args.samples:
-            batch_n = min(BATCH, args.samples - processed)
-            params_batch = [asdict(random_params(rng)) for _ in range(batch_n)]
+            remaining  = args.samples - processed
+            n_tasks    = max(1, min(n_workers * 2, remaining // max(SEG_SIZE // 2, 1)))
+            actual_seg = max(1, min(SEG_SIZE, remaining // n_tasks))
+            tasks = [{"n": actual_seg, "seed": rng.randint(0, 2**32)}
+                     for _ in range(n_tasks)]
             try:
-                results_batch = pool.map(_worker_eval, params_batch, chunksize=64)
+                batch_results = pool.map(_worker_run_segment, tasks)
             except Exception as e:
                 print(f"\n[{ts()}] ⚠ Error en pool.map: {e} — continuando…")
-                processed += batch_n
+                processed += n_tasks * actual_seg
                 continue
-            for r in results_batch:
-                _add(r)
-            processed += batch_n
+            for seg in batch_results:
+                for r in seg:
+                    _add(r)
+            processed += sum(t["n"] for t in tasks)
 
             # Progress
             elapsed  = max(time.time() - start_time, 0.001)
@@ -1213,16 +1293,21 @@ def main():
             for _ in range(8):
                 hc_batch.append(asdict(perturb(sp, rng)))
 
+        # Un chunk por worker — un solo pool.map distribuye todo el HC en paralelo
+        chunk_sz = max(1, len(hc_batch) // n_workers)
+        hc_tasks = [{"params": hc_batch[i:i + chunk_sz]}
+                    for i in range(0, len(hc_batch), chunk_sz)]
+
         with mp.Pool(processes=n_workers, initializer=_worker_init,
                      initargs=initargs, maxtasksperchild=2000) as pool:
-            for i in range(0, len(hc_batch), BATCH):
-                sub = hc_batch[i: i + BATCH]
-                try:
-                    for r in pool.map(_worker_eval, sub, chunksize=64):
+            try:
+                hc_results = pool.map(_worker_run_hc_segment, hc_tasks)
+                for seg in hc_results:
+                    for r in seg:
                         _add(r)
-                except Exception as e:
-                    print(f"\n[{ts()}] ⚠ Error HC pool.map: {e} — continuando…")
-                processed += len(sub)
+                processed += len(hc_batch)
+            except Exception as e:
+                print(f"\n[{ts()}] ⚠ Error HC pool.map: {e} — continuando…")
 
         print(f"[{ts()}] ✓ Hill climbing completado. Total procesadas: {processed:,}")
 
