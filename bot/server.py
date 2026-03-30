@@ -9,12 +9,20 @@ GET /health     → "OK" para UptimeRobot
 import os
 import sys
 import json
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sim_engine
 import backtest_engine
+
+_SERVER_START = time.time()
+
+try:
+    import telegram_alerts as _tg
+except Exception:
+    _tg = None
 
 
 # ─── HTML EMBEBIDO ────────────────────────────────────────────────────────────
@@ -24,6 +32,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>AlphaChainBots \xe2\x80\x94 Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x2B21;</text></svg>">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#07090f;color:#c9d4e0;font-family:'Courier New',monospace;font-size:13px;padding-bottom:40px}
@@ -157,6 +166,22 @@ tr:hover td{background:#0d1420}
 .fng-ef{color:#ff1744}.fng-f{color:#ff6d00}.fng-n{color:#ffd740}
 .fng-g{color:#69f0ae}.fng-eg{color:#00e676}
 
+/* ── STATUS DOT ── */
+.sdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-left:5px;vertical-align:middle;flex-shrink:0}
+.sdot-g{background:#00e676;box-shadow:0 0 4px #00e676}
+.sdot-y{background:#ffd740;box-shadow:0 0 4px #ffd740}
+.sdot-r{background:#ff4466;box-shadow:0 0 4px #ff4466}
+
+/* ── SORTABLE TABLE ── */
+.tbl-sort th{cursor:pointer;user-select:none}
+.tbl-sort th:hover{color:#4fc3f7}
+.sort-asc::after{content:' ▲';font-size:8px}
+.sort-desc::after{content:' ▼';font-size:8px}
+
+/* ── OPTIMIZER ── */
+.opt-spinner{display:inline-block;width:12px;height:12px;border:2px solid #1e3a4a;border-top-color:#4fc3f7;border-radius:50%;animation:spin .8s linear infinite;margin-right:6px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+
 /* ── BACKTEST ── */
 .bt-ph{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
 .bt-tabs{display:flex;gap:6px}
@@ -188,9 +213,27 @@ tr:hover td{background:#0d1420}
   <!-- ── EXECUTIVE SUMMARY BAR ──────────────────────────────────────────────── -->
   <div class="exec-bar" id="exec-bar">
     <div class="exec-item">
-      <div class="exec-lbl">PnL HOY</div>
-      <div class="exec-val big nu" id="exec-pnl-day">—</div>
-      <div class="exec-sub" id="exec-pnl-day-pct"></div>
+      <div class="exec-lbl">Capital Total</div>
+      <div class="exec-val big nu">$260K</div>
+      <div class="exec-sub">26 bots × $10K</div>
+    </div>
+    <div class="exec-div"></div>
+    <div class="exec-item">
+      <div class="exec-lbl">PnL Acumulado</div>
+      <div class="exec-val big nu" id="exec-total-pnl">—</div>
+      <div class="exec-sub" id="exec-total-pnl-pct"></div>
+    </div>
+    <div class="exec-div"></div>
+    <div class="exec-item">
+      <div class="exec-lbl">Bots Rentables</div>
+      <div class="exec-val nu" id="exec-profitable">—</div>
+      <div class="exec-sub" id="exec-profitable-sub"></div>
+    </div>
+    <div class="exec-div"></div>
+    <div class="exec-item">
+      <div class="exec-lbl">Win Rate Global</div>
+      <div class="exec-val nu" id="exec-winrate">—</div>
+      <div class="exec-sub" id="exec-winrate-sub"></div>
     </div>
     <div class="exec-div"></div>
     <div class="exec-item">
@@ -200,21 +243,9 @@ tr:hover td{background:#0d1420}
     </div>
     <div class="exec-div"></div>
     <div class="exec-item">
-      <div class="exec-lbl">Peor Bot</div>
-      <div class="exec-val dn" id="exec-worst" style="font-size:13px;padding-top:4px">—</div>
-      <div class="exec-sub" id="exec-worst-pnl"></div>
-    </div>
-    <div class="exec-div"></div>
-    <div class="exec-item">
-      <div class="exec-lbl">Posiciones</div>
-      <div class="exec-val nu" id="exec-openpos">—</div>
-      <div class="exec-sub">abiertas ahora</div>
-    </div>
-    <div class="exec-div"></div>
-    <div class="exec-item">
-      <div class="exec-lbl">Bots en &#x2B;</div>
-      <div class="exec-val nu" id="exec-pos-pct">—</div>
-      <div class="exec-sub" id="exec-pos-sub"></div>
+      <div class="exec-lbl">Max DD Global</div>
+      <div class="exec-val nu" id="exec-maxdd">—</div>
+      <div class="exec-sub">peor bot</div>
     </div>
   </div>
   <!-- ── FIN EXECUTIVE BAR ────────────────────────────────────────────────── -->
@@ -311,13 +342,20 @@ tr:hover td{background:#0d1420}
       <!-- Comparison table -->
       <div class="bt-sec-title">Tabla Comparativa <span style="color:#37505f;font-size:9px">(ordenado por PnL desc)</span></div>
       <div class="tbl-wrap" style="padding:0 10px 10px">
-        <table id="bt-tbl">
+        <table id="bt-tbl" class="tbl-sort">
           <thead><tr>
-            <th>#</th><th>Bot</th><th>Estrategia</th>
-            <th>PnL $</th><th>PnL %</th><th>Win%</th>
-            <th>Trades</th><th>Max DD%</th>
-            <th>Mejor $</th><th>Peor $</th>
-            <th>Sharpe</th><th>PF</th>
+            <th>#</th>
+            <th onclick="btSortBy('label')">Bot</th>
+            <th onclick="btSortBy('strategy')">Estrategia</th>
+            <th onclick="btSortBy('total_pnl')" id="btsort-total_pnl" class="sort-desc">PnL $</th>
+            <th onclick="btSortBy('total_pnl_pct')">PnL %</th>
+            <th onclick="btSortBy('win_rate')">Win%</th>
+            <th onclick="btSortBy('total_trades')">Trades</th>
+            <th onclick="btSortBy('max_drawdown')">Max DD%</th>
+            <th onclick="btSortBy('best_trade')">Mejor $</th>
+            <th onclick="btSortBy('worst_trade')">Peor $</th>
+            <th onclick="btSortBy('sharpe')">Sharpe</th>
+            <th onclick="btSortBy('profit_factor')">PF</th>
           </tr></thead>
           <tbody id="bt-tbody"></tbody>
         </table>
@@ -326,6 +364,36 @@ tr:hover td{background:#0d1420}
     </div>
   </div>
   <!-- ── FIN BACKTEST ─────────────────────────────────────────────────────── -->
+
+  <!-- ── OPTIMIZER SECTION ─────────────────────────────────────────────────── -->
+  <div class="panel" id="opt-section">
+    <div class="ph">
+      <span>&#x1F52C; Optimizador de Par&aacute;metros</span>
+      <span class="mkt-upd" id="opt-upd-ts"></span>
+    </div>
+    <div id="opt-pending" style="padding:12px 14px;color:#546e7a;font-size:12px">
+      <span class="opt-spinner"></span>Buscando resultados de optimizaci&oacute;n&hellip;
+    </div>
+    <div id="opt-results" style="display:none">
+      <div class="bt-sec-title">Top 30 Combinaciones de Par&aacute;metros</div>
+      <div class="tbl-wrap" style="padding:0 10px 10px">
+        <table>
+          <thead><tr>
+            <th>#</th><th>PnL $</th><th>PnL %</th><th>Win%</th><th>Trades</th>
+            <th>Timeframe</th><th>MA</th><th>Fast</th><th>Slow</th>
+            <th>Lev.</th><th>Trail%</th><th>RSI OB</th><th>RSI OS</th>
+            <th>Sharpe</th><th>PF</th>
+          </tr></thead>
+          <tbody id="opt-tbody"></tbody>
+        </table>
+      </div>
+      <div style="font-size:9px;color:#263a4a;padding:4px 10px 10px" id="opt-computed-at"></div>
+    </div>
+    <div id="opt-empty" style="display:none;padding:12px 14px;color:#37505f;font-size:12px">
+      Sin resultados todav&iacute;a. Ejecuta <code style="color:#4fc3f7">python optimizer.py</code> para generar top_params.json.
+    </div>
+  </div>
+  <!-- ── FIN OPTIMIZER ──────────────────────────────────────────────────────── -->
 
   <!-- ── FILTER BAR ────────────────────────────────────────────────────────── -->
   <div class="flt-bar">
@@ -413,38 +481,37 @@ function render(d){
     <div class="stat"><div class="stat-l">Modo</div><div class="stat-v nu">SIMULACI&#211;N</div></div>`;
 
   // ── Executive Summary Bar ─────────────────────────────────────────────────
-  const today = new Date().toLocaleDateString('es');
-  let dayPnl = 0;
-  d.bots.forEach(b => b.portfolio.history.forEach(t => {
-    if(t.closed_at && t.closed_at.startsWith(today)) dayPnl += (t.pnl||0);
-  }));
-  const dpCls = pc(dayPnl);
-  document.getElementById('exec-pnl-day').className = 'exec-val big '+dpCls;
-  document.getElementById('exec-pnl-day').textContent = (dayPnl>=0?'+':'') + dayPnl.toFixed(2) + '$';
-  const dayPct = d.initial_equity>0 ? dayPnl/d.initial_equity*100 : 0;
-  document.getElementById('exec-pnl-day-pct').textContent = (dayPct>=0?'+':'') + dayPct.toFixed(2) + '%';
+  const totalPnl = d.total_pnl;
+  const totalPct = d.total_pnl_pct;
+  const tpCls = pc(totalPnl);
+  document.getElementById('exec-total-pnl').className = 'exec-val big '+tpCls;
+  document.getElementById('exec-total-pnl').textContent = (totalPnl>=0?'+':'') + totalPnl.toFixed(2) + '$';
+  document.getElementById('exec-total-pnl-pct').textContent = (totalPct>=0?'+':'') + totalPct.toFixed(2) + '%';
+
+  const nProfit = d.bots.filter(b=>b.portfolio.total_pnl>0).length;
+  const nTot = d.bots.length;
+  document.getElementById('exec-profitable').className = 'exec-val '+(nProfit>=nTot/2?'up':'dn');
+  document.getElementById('exec-profitable').textContent = nProfit+'/'+nTot;
+  document.getElementById('exec-profitable-sub').textContent = nProfit>=nTot/2?'rentables':'en pérdidas';
+
+  let totalWins=0, totalTrades=0;
+  d.bots.forEach(b=>{ totalWins+=b.portfolio.wins||0; totalTrades+=b.portfolio.trades||0; });
+  const wr = totalTrades>0 ? (totalWins/totalTrades*100).toFixed(1) : '—';
+  document.getElementById('exec-winrate').className = 'exec-val '+(totalTrades>0?(totalWins/totalTrades>=0.5?'up':'dn'):'nu');
+  document.getElementById('exec-winrate').textContent = wr+(totalTrades>0?'%':'');
+  document.getElementById('exec-winrate-sub').textContent = totalTrades>0?totalWins+'/'+totalTrades+' ops':'sin trades';
 
   const byPnl = [...d.bots].sort((a,b)=>b.portfolio.total_pnl - a.portfolio.total_pnl);
-  const best  = byPnl[0], worst = byPnl[byPnl.length-1];
+  const best = byPnl[0];
   if(best){
     document.getElementById('exec-best').textContent = best.label;
-    document.getElementById('exec-best-pnl').textContent = '+$'+best.portfolio.total_pnl.toFixed(0);
-  }
-  if(worst){
-    document.getElementById('exec-worst').textContent = worst.label;
-    document.getElementById('exec-worst-pnl').textContent = '$'+worst.portfolio.total_pnl.toFixed(0);
+    document.getElementById('exec-best-pnl').textContent = (best.portfolio.total_pnl>=0?'+':'')+'$'+best.portfolio.total_pnl.toFixed(0);
   }
 
-  let totalOpen = 0;
-  d.bots.forEach(b => totalOpen += b.portfolio.positions.length);
-  document.getElementById('exec-openpos').textContent = totalOpen;
-
-  const nPos = d.bots.filter(b=>b.portfolio.total_pnl>0).length;
-  const nTot = d.bots.length;
-  const pPct = nTot>0 ? Math.round(nPos/nTot*100) : 0;
-  document.getElementById('exec-pos-pct').className = 'exec-val '+(pPct>=50?'up':'dn');
-  document.getElementById('exec-pos-pct').textContent = pPct+'%';
-  document.getElementById('exec-pos-sub').textContent = nPos+'/'+nTot+' bots';
+  let maxDD = 0, maxDDBot = '';
+  d.bots.forEach(b=>{ const dd=b.portfolio.max_drawdown||0; if(dd>maxDD){maxDD=dd;maxDDBot=b.label;} });
+  document.getElementById('exec-maxdd').className = 'exec-val '+(maxDD>20?'dn':maxDD>10?'':'nu');
+  document.getElementById('exec-maxdd').textContent = maxDD.toFixed(1)+'%';
 
   // ── Bot cards ─────────────────────────────────────────────────────────────
   document.getElementById('bot-cards').innerHTML=d.bots.map((b,i)=>{
@@ -457,11 +524,12 @@ function render(d){
     const sBadge=b.status==='escaneando'
       ?'<span class="b b-entry">SCAN</span>'
       :'<span class="b b-wait">'+b.status+'</span>';
+    const dotCls = p.positions.length>0?'sdot-g':(p.total_pnl>0?'sdot-y':'sdot-r');
     const bType = b.ma_type==='liq'?'liq':'ema';
     const firstCoin = (b.coins&&b.coins[0])||'BTC';
     return `<div class="card ${cv}" data-interval="${b.interval}" data-pnl-pos="${p.total_pnl>=0?1:0}" data-type="${bType}"
       onclick="openTVModal('${firstCoin}','${b.interval}','${b.label}')">
-      <div class="card-name ${cc}">${b.label} ${sBadge}</div>
+      <div class="card-name ${cc}">${b.label} ${sBadge}<span class="sdot ${dotCls}"></span></div>
       <div class="card-meta">${ma} &middot; ${b.interval} &middot; trailing ${tr}% &middot; coins: ${b.coins.slice(0,5).join(', ')}&hellip;</div>
       <div class="card-eq">$${fmt(p.equity)}</div>
       <div class="card-pnl ${pc2}">${fp(p.total_pnl)}$ (${fp(p.total_pnl_pct)}%)</div>
@@ -758,17 +826,26 @@ function fetchMarket(){
 
 // ── FILTER BAR ───────────────────────────────────────────────────────────────
 let _curFilter = 'all';
+function _filterShow(el, f){
+  if(f==='all') return true;
+  if(f==='win')  return el.dataset.pnlPos === '1';
+  if(f==='lose') return el.dataset.pnlPos === '0';
+  if(['15m','30m','1h','4h'].includes(f)) return el.dataset.interval === f;
+  if(f==='liq') return el.dataset.type === 'liq';
+  return true;
+}
 function applyFilter(f, btn){
   _curFilter = f;
   document.querySelectorAll('.flt-btn').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
   document.querySelectorAll('#bot-cards .card').forEach(card=>{
-    let show = true;
-    if(f==='win')  show = card.dataset.pnlPos === '1';
-    else if(f==='lose') show = card.dataset.pnlPos === '0';
-    else if(['15m','30m','1h','4h'].includes(f)) show = card.dataset.interval === f;
-    else if(f==='liq') show = card.dataset.type === 'liq';
-    card.style.display = show ? '' : 'none';
+    card.style.display = _filterShow(card, f) ? '' : 'none';
+  });
+  document.querySelectorAll('#bt-eq-grid .bt-eq-card').forEach(card=>{
+    card.style.display = _filterShow(card, f) ? '' : 'none';
+  });
+  document.querySelectorAll('#bt-tbody tr').forEach(row=>{
+    row.style.display = _filterShow(row, f) ? '' : 'none';
   });
 }
 
@@ -787,7 +864,7 @@ function _loadTVScript(cb){
   document.head.appendChild(s);
 }
 function openTVModal(coin, interval, label){
-  const sym  = 'HYPERLIQUID:'+coin+'USDT';
+  const sym  = 'BINANCE:'+coin+'USDT';
   const iv   = TV_IV[interval] || '60';
   document.getElementById('tv-modal-title').textContent = label + ' — ' + coin + 'USDT · ' + interval;
   document.getElementById('tv-overlay').classList.add('open');
@@ -824,6 +901,15 @@ const FNG_COLORS = [[0,'#ff1744'],[25,'#ff6d00'],[50,'#ffd740'],[55,'#69f0ae'],[
 const FNG_CLASSES = {
   'Extreme Fear':'fng-ef','Fear':'fng-f','Neutral':'fng-n',
   'Greed':'fng-g','Extreme Greed':'fng-eg'
+};
+const FNG_ES = {
+  'Extreme Fear':'Miedo Extremo','Fear':'Miedo','Neutral':'Neutral',
+  'Greed':'Codicia','Extreme Greed':'Codicia Extrema'
+};
+const FNG_BG = {
+  'Extreme Fear':'rgba(255,23,68,0.07)','Fear':'rgba(255,109,0,0.07)',
+  'Neutral':'rgba(255,215,64,0.06)','Greed':'rgba(105,240,174,0.07)',
+  'Extreme Greed':'rgba(0,230,118,0.09)'
 };
 function _fngArcPath(cx,cy,r,startDeg,endDeg){
   const toR=d=>d*Math.PI/180;
@@ -866,12 +952,15 @@ function renderFNG(val, label, ts){
 
   // Text info
   const cls = FNG_CLASSES[label] || 'nu';
+  const labelEs = FNG_ES[label] || label;
   const vEl = document.getElementById('fng-val');
   const lEl = document.getElementById('fng-lbl');
   if(vEl){ vEl.textContent = val; vEl.className = 'fng-val '+cls; }
-  if(lEl){ lEl.textContent = label; lEl.className = 'fng-lbl '+cls; }
+  if(lEl){ lEl.textContent = labelEs; lEl.className = 'fng-lbl '+cls; }
   const tsEl = document.getElementById('fng-ts');
   if(tsEl) tsEl.textContent = ts ? 'Actualizado: '+new Date(ts*1000).toLocaleString('es') : '';
+  const wrap = document.getElementById('fng-wrap');
+  if(wrap) wrap.style.background = FNG_BG[label] || '';
 }
 function fetchFNG(){
   fetch('https://api.alternative.me/fng/?limit=1&format=json')
@@ -893,7 +982,7 @@ function fetchFNG(){
 fetchData();
 fetchMarket();
 fetchFNG();
-setInterval(fetchFNG, 600_000); // actualiza cada 10 min
+setInterval(fetchFNG, 300_000); // actualiza cada 5 min
 
 // ── BACKTEST ──────────────────────────────────────────────────────────────────
 let _btPeriod = null, _btPoll = null;
@@ -959,6 +1048,10 @@ function btRenderEquity(bots){
   bots.forEach((b,i)=>{
     const card = document.createElement('div');
     card.className = 'bt-eq-card';
+    card.dataset.interval = b.interval || 'liq';
+    card.dataset.type = b.strategy==='liq'||b.interval==='liq'?'liq':'ema';
+    card.dataset.pnlPos = b.total_pnl>=0?'1':'0';
+    if(_curFilter !== 'all') card.style.display = _filterShow(card, _curFilter)?'':'none';
     const pCls = b.total_pnl>=0?'up':'dn';
     const sign = b.total_pnl>=0?'+':'';
     card.innerHTML = `
@@ -1020,16 +1113,40 @@ function btRenderBar(bots){
   });
 }
 
-function btRenderTable(bots){
+let _btSortKey = 'total_pnl', _btSortAsc = false, _btSortBots = [];
+function btSortBy(key){
+  if(_btSortKey === key) _btSortAsc = !_btSortAsc;
+  else { _btSortKey = key; _btSortAsc = false; }
+  document.querySelectorAll('#bt-tbl th[id^="btsort-"]').forEach(th=>{
+    th.classList.remove('sort-asc','sort-desc');
+    th.removeAttribute('id');
+  });
+  document.querySelectorAll('#bt-tbl th').forEach(th=>{
+    if(th.getAttribute('onclick')==='btSortBy(\''+key+'\')'){
+      th.id = 'btsort-'+key;
+      th.classList.add(_btSortAsc?'sort-asc':'sort-desc');
+    }
+  });
+  _btDoRenderTable(_btSortBots);
+}
+function _btDoRenderTable(bots){
+  _btSortBots = bots;
+  const sorted = [...bots].sort((a,b)=>{
+    const av = a[_btSortKey], bv = b[_btSortKey];
+    if(typeof av === 'string') return _btSortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+    return _btSortAsc ? av - bv : bv - av;
+  });
   const tb = document.getElementById('bt-tbody');
   if(!tb) return;
-  tb.innerHTML = bots.map((b,i)=>{
+  tb.innerHTML = sorted.map((b,i)=>{
     const pCls = b.total_pnl>=0?'up':'dn';
     const ddCls= b.max_drawdown>20?'dn':b.max_drawdown>10?'':'nu';
     const sCls = b.sharpe>=1.0?'up':b.sharpe<0?'dn':'nu';
     const pfCls= b.profit_factor>=1.0?'up':'dn';
     const sign = b.total_pnl>=0?'+':'';
-    return `<tr>
+    const bType = b.strategy==='liq'||b.interval==='liq'?'liq':'ema';
+    return `<tr data-interval="${b.interval||'liq'}" data-type="${bType}" data-pnl-pos="${b.total_pnl>=0?1:0}"
+      style="${_curFilter!=='all'&&!_filterShow({dataset:{interval:b.interval||'liq',type:bType,pnlPos:b.total_pnl>=0?'1':'0'}},_curFilter)?'display:none':''}">
       <td style="color:#37505f">${i+1}</td>
       <td class="${COLS[b.idx%18]}">${b.label}</td>
       <td style="font-size:10px;color:#78909c">${b.strategy}</td>
@@ -1045,6 +1162,65 @@ function btRenderTable(bots){
     </tr>`;
   }).join('');
 }
+function btRenderTable(bots){ _btSortBots = bots; _btDoRenderTable(bots); }
+
+// ── OPTIMIZER ─────────────────────────────────────────────────────────────────
+let _optPoll = null;
+function startOptPoller(){
+  fetchOptResults();
+  _optPoll = setInterval(fetchOptResults, 60_000);
+}
+function fetchOptResults(){
+  fetch('/api/optimizer/results')
+    .then(r=>r.json())
+    .then(d=>{
+      document.getElementById('opt-pending').style.display='none';
+      if(d.ok && d.results && d.results.length){
+        renderOptResults(d);
+      } else {
+        document.getElementById('opt-empty').style.display='block';
+        document.getElementById('opt-results').style.display='none';
+      }
+    })
+    .catch(()=>{
+      document.getElementById('opt-pending').style.display='none';
+      document.getElementById('opt-empty').style.display='block';
+    });
+}
+function renderOptResults(d){
+  document.getElementById('opt-results').style.display='block';
+  document.getElementById('opt-empty').style.display='none';
+  const ts = d.generated_at ? 'Generado: '+d.generated_at : '';
+  document.getElementById('opt-computed-at').textContent = ts;
+  document.getElementById('opt-upd-ts').textContent = ts ? ts.replace('Generado: ','') : '';
+  const tb = document.getElementById('opt-tbody');
+  if(!tb) return;
+  const top = (d.results||[]).slice(0,30);
+  tb.innerHTML = top.map((p,i)=>{
+    const pCls = (p.total_pnl||0)>=0?'up':'dn';
+    const sign = (p.total_pnl||0)>=0?'+':'';
+    const sCls = (p.sharpe||0)>=1?'up':(p.sharpe||0)<0?'dn':'nu';
+    const pfCls= (p.profit_factor||0)>=1?'up':'dn';
+    return `<tr>
+      <td style="color:#37505f">${i+1}</td>
+      <td class="${pCls}">${sign}${(p.total_pnl||0).toFixed(2)}</td>
+      <td class="${pCls}">${sign}${(p.total_pnl_pct||0).toFixed(1)}%</td>
+      <td>${(p.win_rate||0).toFixed(1)}%</td>
+      <td>${p.total_trades||0}</td>
+      <td>${p.interval||'—'}</td>
+      <td>${(p.ma_type||'').toUpperCase()}</td>
+      <td>${p.ma_fast||'—'}</td>
+      <td>${p.ma_slow||'—'}</td>
+      <td>${p.leverage||'—'}x</td>
+      <td>${((p.trailing_pct||0)*100).toFixed(1)}%</td>
+      <td>${p.rsi_ob||'—'}</td>
+      <td>${p.rsi_os||'—'}</td>
+      <td class="${sCls}">${(p.sharpe||0).toFixed(2)}</td>
+      <td class="${pfCls}">${(p.profit_factor||0).toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+}
+startOptPoller();
 </script>
 </body>
 </html>"""
@@ -1057,7 +1233,29 @@ class DashHandler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
 
         if path == "/health":
-            self._respond(200, "text/plain", b"OK")
+            try:
+                state = sim_engine.get_state()
+                bots_data = state.get("bots", [])
+                bots_activos = len(bots_data)
+                bots_con_pos = sum(1 for b in bots_data if b["portfolio"]["positions"])
+                ultima = ""
+                for b in bots_data:
+                    sigs = b.get("signals", [])
+                    if sigs:
+                        t = sigs[0].get("time", "")
+                        if t > ultima:
+                            ultima = t
+            except Exception:
+                bots_activos, bots_con_pos, ultima = 0, 0, ""
+            health = {
+                "status": "ok",
+                "uptime_seconds": int(time.time() - _SERVER_START),
+                "bots_activos": bots_activos,
+                "bots_con_posicion": bots_con_pos,
+                "ultima_senal": ultima,
+                "version": "1.0.0",
+            }
+            self._respond(200, "application/json", json.dumps(health).encode())
 
         elif path == "/api/status":
             try:
@@ -1093,6 +1291,41 @@ class DashHandler(BaseHTTPRequestHandler):
                 period = "3m"
             backtest_engine.run_backtest_bg(period)
             self._respond(200, "application/json", b'{"ok":true}')
+
+        elif path == "/api/optimizer/results":
+            search_paths = [
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), "top_params.json"),
+                os.path.join(os.path.dirname(os.path.abspath(__file__)), "resultados", "top_params.json"),
+                os.path.join(os.getcwd(), "top_params.json"),
+                os.path.join(os.getcwd(), "resultados", "top_params.json"),
+            ]
+            found = None
+            for p2 in search_paths:
+                if os.path.isfile(p2):
+                    found = p2
+                    break
+            if found:
+                try:
+                    with open(found, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    results = data if isinstance(data, list) else data.get("results", [])
+                    generated_at = "" if isinstance(data, list) else data.get("generated_at", "")
+                    body = json.dumps({"ok": True, "results": results, "generated_at": generated_at}).encode()
+                except Exception as e:
+                    body = json.dumps({"ok": False, "error": str(e)}).encode()
+            else:
+                body = json.dumps({"ok": False, "results": []}).encode()
+            self._respond(200, "application/json", body)
+
+        elif path == "/api/telegram/test":
+            if _tg is None:
+                result = {"ok": False, "error": "telegram_alerts no disponible"}
+            else:
+                try:
+                    result = _tg.test_connection()
+                except Exception as e:
+                    result = {"ok": False, "error": str(e)}
+            self._respond(200, "application/json", json.dumps(result).encode())
 
         elif path in ("/", "/index.html"):
             self._respond(200, "text/html; charset=utf-8", DASHBOARD_HTML.encode("utf-8"))

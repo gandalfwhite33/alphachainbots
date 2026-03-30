@@ -12,6 +12,11 @@ from typing import Optional
 
 import random
 
+try:
+    import telegram_alerts as _tg
+except Exception:
+    _tg = None
+
 import requests
 import pandas as pd
 
@@ -565,13 +570,15 @@ class VirtualPos:
 # ─── PORTFOLIO VIRTUAL ────────────────────────────────────────────────────────
 class VirtualPortfolio:
     def __init__(self):
-        self.cash       = INITIAL_EQUITY
+        self.cash         = INITIAL_EQUITY
         self.positions: dict[str, VirtualPos] = {}
-        self.closed_pnl = 0.0
-        self.trades     = 0
-        self.wins       = 0
-        self.history:   list[dict] = []
-        self._lock      = threading.Lock()
+        self.closed_pnl   = 0.0
+        self.trades       = 0
+        self.wins         = 0
+        self.history:     list[dict] = []
+        self._lock        = threading.Lock()
+        self._peak_equity = INITIAL_EQUITY
+        self.max_drawdown = 0.0  # % máx drawdown histórico
 
     @property
     def equity(self) -> float:
@@ -615,6 +622,13 @@ class VirtualPortfolio:
             self.trades     += 1
             if pnl > 0:
                 self.wins += 1
+            eq = self.equity
+            if eq > self._peak_equity:
+                self._peak_equity = eq
+            elif self._peak_equity > 0:
+                dd = (self._peak_equity - eq) / self._peak_equity * 100
+                if dd > self.max_drawdown:
+                    self.max_drawdown = dd
             if len(self.history) >= MAX_TRADES:
                 self.history.pop(0)
             self.history.append({
@@ -634,28 +648,30 @@ class VirtualPortfolio:
     def to_dict(self) -> dict:
         with self._lock:
             return {
-                "equity":       round(self.equity, 2),
-                "cash":         round(self.cash, 2),
-                "total_pnl":    round(self.total_pnl, 2),
+                "equity":        round(self.equity, 2),
+                "cash":          round(self.cash, 2),
+                "total_pnl":     round(self.total_pnl, 2),
                 "total_pnl_pct": round(self.total_pnl_pct, 2),
-                "trades":       self.trades,
-                "wins":         self.wins,
-                "positions":    [p.to_dict() for p in self.positions.values()],
-                "history":      list(reversed(self.history)),
+                "trades":        self.trades,
+                "wins":          self.wins,
+                "max_drawdown":  round(self.max_drawdown, 2),
+                "positions":     [p.to_dict() for p in self.positions.values()],
+                "history":       list(reversed(self.history)),
             }
 
 
 # ─── BOT SIMULADO ─────────────────────────────────────────────────────────────
 class SimBot:
     def __init__(self, cfg: BotConfig, coins: list):
-        self.cfg       = cfg
-        self.coins     = coins
-        self.portfolio = VirtualPortfolio()
-        self.last_scan = "—"
-        self.status    = "iniciando"
-        self.errors    = 0
-        self.signals:  list[dict] = []
-        self._sig_lock = threading.Lock()
+        self.cfg            = cfg
+        self.coins          = coins
+        self.portfolio      = VirtualPortfolio()
+        self.last_scan      = "—"
+        self.status         = "iniciando"
+        self.errors         = 0
+        self.signals:       list[dict] = []
+        self._sig_lock      = threading.Lock()
+        self._dd_alert_sent = False
 
     def _log_signal(self, coin: str, sig_type: str, action: str, reason: str = "") -> None:
         entry = {
@@ -727,6 +743,13 @@ class SimBot:
                         if pnl is not None:
                             self._log_signal(coin, "CIERRE",
                                              f"PnL {pnl:+.2f}$", reason)
+                            if _tg:
+                                hist = self.portfolio.history
+                                pnl_pct = hist[-1]["pnl_pct"] if hist else 0.0
+                                _tg.send_alert(
+                                    f"🔴 <b>{cfg.label}</b> cerró {coin} | "
+                                    f"PnL: ${pnl:+.2f} ({pnl_pct:+.1f}%) | Motivo: {reason}"
+                                )
                     continue
 
                 # Búsqueda de entrada
@@ -752,10 +775,25 @@ class SimBot:
                 if opened:
                     self._log_signal(coin, signal.upper(),
                                      f"ENTRADA @ {entry:,.4f}")
+                    if _tg:
+                        pos  = self.portfolio.positions.get(coin)
+                        stop = pos.trailing_stop.stop if pos else 0.0
+                        _tg.send_alert(
+                            f"🟢 <b>{cfg.label}</b> {signal.upper()} {coin} "
+                            f"@ ${entry:,.4f} | SL: ${stop:,.4f}"
+                        )
 
             except Exception as e:
                 self.errors += 1
                 print(f"[{cfg.label}] Error {coin}: {e}")
+
+        if _tg and not self._dd_alert_sent:
+            dd = self.portfolio.max_drawdown
+            if dd > 15.0:
+                _tg.send_alert(
+                    f"⚠️ <b>{cfg.label}</b> Drawdown máximo {dd:.1f}% — revisión recomendada"
+                )
+                self._dd_alert_sent = True
 
         self.status = "esperando"
 
@@ -788,13 +826,14 @@ class SimBot:
 # ─── BOT DE LIQUIDACIONES ─────────────────────────────────────────────────────
 class LiqBot:
     def __init__(self, cfg: LiqConfig):
-        self.cfg       = cfg
-        self.portfolio = VirtualPortfolio()
-        self.last_scan = "—"
-        self.status    = "iniciando"
-        self.errors    = 0
-        self.signals:  list[dict] = []
-        self._sig_lock = threading.Lock()
+        self.cfg            = cfg
+        self.portfolio      = VirtualPortfolio()
+        self.last_scan      = "—"
+        self.status         = "iniciando"
+        self.errors         = 0
+        self.signals:       list[dict] = []
+        self._sig_lock      = threading.Lock()
+        self._dd_alert_sent = False
 
     def _log_signal(self, coin: str, sig_type: str, action: str, reason: str = "") -> None:
         entry = {
@@ -915,6 +954,13 @@ class LiqBot:
                         pnl = self.portfolio.close(coin, reason)
                         if pnl is not None:
                             self._log_signal(coin, "CIERRE", f"PnL {pnl:+.2f}$", reason)
+                            if _tg:
+                                hist = self.portfolio.history
+                                pnl_pct = hist[-1]["pnl_pct"] if hist else 0.0
+                                _tg.send_alert(
+                                    f"🔴 <b>{self.cfg.label}</b> cerró {coin} | "
+                                    f"PnL: ${pnl:+.2f} ({pnl_pct:+.1f}%) | Motivo: {reason}"
+                                )
                     continue
                 signal = self._get_signal(coin, coins, liq, oi_hist)
                 if not signal:
@@ -922,9 +968,25 @@ class LiqBot:
                 opened = self.portfolio.open(coin, signal, price, self.cfg)
                 if opened:
                     self._log_signal(coin, signal.upper(), f"ENTRADA @ {price:,.4f}")
+                    if _tg:
+                        pos  = self.portfolio.positions.get(coin)
+                        stop = pos.trailing_stop.stop if pos else 0.0
+                        _tg.send_alert(
+                            f"🟢 <b>{self.cfg.label}</b> {signal.upper()} {coin} "
+                            f"@ ${price:,.4f} | SL: ${stop:,.4f}"
+                        )
             except Exception as e:
                 self.errors += 1
                 print(f"[{self.cfg.label}] Error {coin}: {e}")
+
+        if _tg and not self._dd_alert_sent:
+            dd = self.portfolio.max_drawdown
+            if dd > 15.0:
+                _tg.send_alert(
+                    f"⚠️ <b>{self.cfg.label}</b> Drawdown máximo {dd:.1f}% — revisión recomendada"
+                )
+                self._dd_alert_sent = True
+
         self.status = "esperando"
 
     def run(self) -> None:
