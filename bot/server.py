@@ -635,14 +635,9 @@ function startCD(){
 
 function fetchData(){
   fetch('/api/status')
-    .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(r=>r.json())
     .then(data=>{ render(data); startCD(); })
-    .catch(err=>{
-      render(null);
-      document.getElementById('bot-cards').innerHTML =
-        `<div style="grid-column:1/-1;padding:22px;text-align:center;color:#ff4466;font-size:12px">&#9888; ${err.message||'Error de red'} &mdash; reintentando en 30s&hellip;</div>`;
-      startCD();
-    });
+    .catch(()=>startCD());
 }
 function fetchBots(){ return fetchData(); }
 
@@ -833,13 +828,9 @@ function startMktCD(){
 
 function fetchMarket(){
   fetch('/api/market')
-    .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(r=>r.json())
     .then(data=>{ renderMarket(data); startMktCD(); })
-    .catch(err=>{
-      const el = document.getElementById('oi-body');
-      if(el) el.innerHTML='<tr><td colspan="7" class="empty">Error cargando datos &mdash; '+err.message+'</td></tr>';
-      startMktCD();
-    });
+    .catch(()=>startMktCD());
 }
 
 // ── FILTER BAR ───────────────────────────────────────────────────────────────
