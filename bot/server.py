@@ -409,9 +409,9 @@ tr:hover td{background:#0d1420}
   </div>
 
   <div class="grid3" id="bot-cards">
-    <div class="card c0"><div class="card-name col0">BOT&middot;4H</div><div class="card-meta">Cargando&hellip;</div></div>
-    <div class="card c1"><div class="card-name col1">BOT&middot;1H&middot;EMA</div><div class="card-meta">Cargando&hellip;</div></div>
-    <div class="card c2"><div class="card-name col2">BOT&middot;1H&middot;SMA</div><div class="card-meta">Cargando&hellip;</div></div>
+    <div style="grid-column:1/-1;padding:22px;text-align:center;color:#37505f;font-size:12px">
+      <span class="opt-spinner"></span>Conectando con los 26 bots&hellip;
+    </div>
   </div>
 
   <div class="panel">
@@ -470,6 +470,14 @@ function fmt(v,d=2){ return Number(v).toLocaleString('en',{minimumFractionDigits
 function fmtPx(v){ return v>=1000?fmt(v,2):v>=1?fmt(v,4):fmt(v,6); }
 
 function render(d){
+  if(!d || !Array.isArray(d.bots)){
+    const msg = (d && d.error) ? 'Error: '+d.error : 'Sin respuesta del servidor';
+    document.getElementById('hdr-stats').innerHTML =
+      `<div class="stat"><div class="stat-l">Estado</div><div class="stat-v dn">${msg}</div></div>`;
+    document.getElementById('bot-cards').innerHTML =
+      `<div style="grid-column:1/-1;padding:22px;text-align:center;color:#ff4466;font-size:12px">&#9888; ${msg} &mdash; reintentando&hellip;</div>`;
+    return;
+  }
   d.bots.sort((a,b)=>b.portfolio.total_pnl - a.portfolio.total_pnl);
   // Header
   const tc=pc(d.total_pnl);
@@ -627,10 +635,16 @@ function startCD(){
 
 function fetchData(){
   fetch('/api/status')
-    .then(r=>r.json())
-    .then(data=>{render(data);startCD();})
-    .catch(()=>startCD());
+    .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(data=>{ render(data); startCD(); })
+    .catch(err=>{
+      render(null);
+      document.getElementById('bot-cards').innerHTML =
+        `<div style="grid-column:1/-1;padding:22px;text-align:center;color:#ff4466;font-size:12px">&#9888; ${err.message||'Error de red'} &mdash; reintentando en 30s&hellip;</div>`;
+      startCD();
+    });
 }
+function fetchBots(){ return fetchData(); }
 
 // ── MARKET DATA ──────────────────────────────────────────────────────────────
 const MKT_REFRESH = 300;
@@ -819,9 +833,13 @@ function startMktCD(){
 
 function fetchMarket(){
   fetch('/api/market')
-    .then(r=>r.json())
-    .then(data=>{renderMarket(data);startMktCD();})
-    .catch(()=>startMktCD());
+    .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(data=>{ renderMarket(data); startMktCD(); })
+    .catch(err=>{
+      const el = document.getElementById('oi-body');
+      if(el) el.innerHTML='<tr><td colspan="7" class="empty">Error cargando datos &mdash; '+err.message+'</td></tr>';
+      startMktCD();
+    });
 }
 
 // ── FILTER BAR ───────────────────────────────────────────────────────────────
@@ -1257,12 +1275,12 @@ class DashHandler(BaseHTTPRequestHandler):
             }
             self._respond(200, "application/json", json.dumps(health).encode())
 
-        elif path == "/api/status":
+        elif path in ("/api/status", "/api/bots"):
             try:
                 data = sim_engine.get_state()
                 body = json.dumps(data).encode()
             except Exception as e:
-                body = json.dumps({"error": str(e)}).encode()
+                body = json.dumps({"error": str(e), "bots": []}).encode()
             self._respond(200, "application/json", body)
 
         elif path == "/api/market":
@@ -1270,7 +1288,7 @@ class DashHandler(BaseHTTPRequestHandler):
                 data = sim_engine.get_market_state()
                 body = json.dumps(data).encode()
             except Exception as e:
-                body = json.dumps({"error": str(e)}).encode()
+                body = json.dumps({"error": str(e), "oi_table": [], "liq": {}}).encode()
             self._respond(200, "application/json", body)
 
         elif path == "/api/backtest":

@@ -820,6 +820,7 @@ class SimBot:
             "coins":        self.coins,
             "portfolio":    self.portfolio.to_dict(),
             "signals":      sigs,
+            "strategy":     f"{self.cfg.ma_type.upper()}{self.cfg.ma_fast}/{self.cfg.ma_slow}",
         }
 
 
