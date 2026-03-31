@@ -678,10 +678,15 @@ def _worker_run_hc_segment(task: dict) -> List[dict]:
 # ─── CHECKPOINT ───────────────────────────────────────────────────────────────
 def save_checkpoint(path: Path, processed: int,
                     results: List[dict], tf_results: Dict[str, List[dict]]):
+    # Guardar los mejores 1000 por PnL (no por orden de inserción)
+    top_by_pnl = sorted(results, key=lambda x: x.get("total_pnl", 0), reverse=True)
     data = {
         "processed":  processed,
-        "results":    results[:1000],
-        "tf_results": {tf: r[:200] for tf, r in tf_results.items()},
+        "results":    top_by_pnl[:1000],
+        "tf_results": {
+            tf: sorted(r, key=lambda x: x.get("total_pnl", 0), reverse=True)[:200]
+            for tf, r in tf_results.items()
+        },
         "timestamp":  datetime.now().isoformat(),
     }
     with open(path, "w", encoding="utf-8") as f:
@@ -700,9 +705,10 @@ def load_checkpoint(path: Path) -> Optional[dict]:
 
 # ─── DEDUPLICACIÓN ESTRICTA ───────────────────────────────────────────────────
 def deduplicate(results: List[dict], top_n: int = 30) -> List[dict]:
-    """Retorna top_n resultados con parámetros estrictamente únicos."""
+    """Retorna top_n resultados con parámetros estrictamente únicos, ordenados por PnL descendente."""
     seen  = set()
     unique = []
+    # Ranking: mayor PnL total primero (NO por win_rate u otro criterio)
     for r in sorted(results, key=lambda x: x.get("total_pnl", 0), reverse=True):
         param_dict = {k: v for k, v in r.items() if k in _PARAM_FIELDS_SET}
         key = hashlib.md5(json.dumps(param_dict, sort_keys=True).encode()).hexdigest()
