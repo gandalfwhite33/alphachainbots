@@ -787,7 +787,7 @@ function _loadTVScript(cb){
   document.head.appendChild(s);
 }
 function openTVModal(coin, interval, label){
-  const sym  = 'HYPERLIQUID:'+coin+'USDT';
+  const sym  = 'BINANCE:'+coin+'USDT';
   const iv   = TV_IV[interval] || '60';
   document.getElementById('tv-modal-title').textContent = label + ' — ' + coin + 'USDT · ' + interval;
   document.getElementById('tv-overlay').classList.add('open');
