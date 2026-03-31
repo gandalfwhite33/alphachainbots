@@ -16,6 +16,7 @@ import random
 import argparse
 import hashlib
 import pickle
+import platform
 import traceback
 import multiprocessing as mp
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -1352,7 +1353,8 @@ def main():
 
 
 if __name__ == "__main__":
-    # 'fork' evita reinicializar el proceso completo en cada worker (Linux).
-    # Debe llamarse antes de cualquier Pool y dentro de __main__.
-    mp.set_start_method("fork", force=True)
+    # 'fork' evita reinicializar el proceso completo en cada worker (Linux/Mac).
+    # Windows no soporta fork — usa spawn por defecto (seguro en todos los SO).
+    if platform.system() != "Windows":
+        mp.set_start_method("fork", force=True)
     main()
