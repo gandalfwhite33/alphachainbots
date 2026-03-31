@@ -679,13 +679,12 @@ def _worker_run_hc_segment(task: dict) -> List[dict]:
 # ─── CHECKPOINT ───────────────────────────────────────────────────────────────
 def save_checkpoint(path: Path, processed: int,
                     results: List[dict], tf_results: Dict[str, List[dict]]):
-    # Guardar los mejores 1000 por PnL (no por orden de inserción)
-    top_by_pnl = sorted(results, key=lambda x: x.get("total_pnl", 0), reverse=True)
+    # Guardar los mejores 1000 por score combinado (no por orden de inserción)
     data = {
         "processed":  processed,
-        "results":    top_by_pnl[:1000],
+        "results":    sorted(results, key=_score, reverse=True)[:1000],
         "tf_results": {
-            tf: sorted(r, key=lambda x: x.get("total_pnl", 0), reverse=True)[:200]
+            tf: sorted(r, key=_score, reverse=True)[:200]
             for tf, r in tf_results.items()
         },
         "timestamp":  datetime.now().isoformat(),
@@ -704,13 +703,27 @@ def load_checkpoint(path: Path) -> Optional[dict]:
         return None
 
 
+# ─── MÉTRICA DE RANKING ───────────────────────────────────────────────────────
+def _score(r: dict) -> float:
+    """
+    Métrica combinada de ranking:
+        score = (PnL_porcentual * WinRate) / MaxDrawdown
+    - PnL_porcentual: rendimiento sobre capital inicial (%)
+    - WinRate: % de trades ganadores (0-100)
+    - MaxDrawdown: drawdown máximo en % (mínimo 1 para evitar div/0)
+    """
+    pnl_pct  = r.get("total_pnl_pct", 0.0)
+    win_rate = r.get("win_rate", 0.0)
+    max_dd   = max(r.get("max_drawdown", 1.0), 1.0)
+    return (pnl_pct * win_rate) / max_dd
+
+
 # ─── DEDUPLICACIÓN ESTRICTA ───────────────────────────────────────────────────
 def deduplicate(results: List[dict], top_n: int = 30) -> List[dict]:
-    """Retorna top_n resultados con parámetros estrictamente únicos, ordenados por PnL descendente."""
+    """Retorna top_n resultados con parámetros estrictamente únicos, ordenados por score descendente."""
     seen  = set()
     unique = []
-    # Ranking: mayor PnL total primero (NO por win_rate u otro criterio)
-    for r in sorted(results, key=lambda x: x.get("total_pnl", 0), reverse=True):
+    for r in sorted(results, key=_score, reverse=True):
         param_dict = {k: v for k, v in r.items() if k in _PARAM_FIELDS_SET}
         key = hashlib.md5(json.dumps(param_dict, sort_keys=True).encode()).hexdigest()
         if key not in seen:
@@ -815,7 +828,7 @@ def save_excel(out_dir: Path, global_top: List[dict], tf_tops: Dict[str, List[di
 
     # Hoja 10: Todas las combinaciones (max 10,000)
     ws10 = wb.create_sheet("Todas_Combinaciones")
-    sorted_all = sorted(all_results, key=lambda x: x.get("total_pnl", 0), reverse=True)
+    sorted_all = sorted(all_results, key=_score, reverse=True)
     write_sheet(ws10, sorted_all[:10_000], "Todas_Combinaciones")
 
     out_path = out_dir / "resultados_optimizacion_v3.xlsx"
@@ -1272,7 +1285,7 @@ def main():
             # Top 3 cada 25k
             if processed - last_top_print >= PRINT_TOP_EVERY:
                 last_top_print = processed
-                top3 = sorted(all_results, key=lambda x: x.get("total_pnl", 0), reverse=True)[:3]
+                top3 = sorted(all_results, key=_score, reverse=True)[:3]
                 print(f"\n[{ts()}] ─── Top 3 actual ────────────────────────────────────")
                 for i, r in enumerate(top3):
                     ma = f"{r.get('ma_type','?').upper()} {r.get('ma_fast','?')}/{r.get('ma_slow','?')}"
@@ -1292,7 +1305,7 @@ def main():
 
     # ── Hill climbing sobre top 20% ───────────────────────────────────────────
     if all_results:
-        sorted_all = sorted(all_results, key=lambda x: x.get("total_pnl", 0), reverse=True)
+        sorted_all = sorted(all_results, key=_score, reverse=True)
         n_seeds    = max(1, len(sorted_all) // 5)
         seeds      = sorted_all[:n_seeds]
         n_hc       = min(n_seeds * 8, 60_000)
