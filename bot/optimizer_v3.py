@@ -19,7 +19,7 @@ import pickle
 import platform
 import traceback
 import multiprocessing as mp
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, asdict, fields
 from datetime import datetime
 from typing import Optional, List, Dict, Tuple
@@ -1164,7 +1164,7 @@ def main():
     print(f"  A probar               : {args.samples:,}")
     print(f"  Días de historial      : {args.days}")
     print(f"  Workers                : {n_workers}")
-    print(f"  Método multiprocessing : {mp.get_start_method()}")
+    print(f"  Método multiprocessing : ProcessPoolExecutor ({platform.system()})")
     print(f"  Salida                 : {out_dir.resolve()}")
     print(f"{sep}\n")
 
@@ -1227,10 +1227,10 @@ def main():
     # ── Test de arranque del Pool ─────────────────────────────────────────────
     n_sys_cores = os.cpu_count() or 1
     print(f"[{ts()}] CPUs del sistema: {n_sys_cores} — usando {n_workers} workers")
-    print(f"[{ts()}] Iniciando Pool de multiprocessing…", end=" ", flush=True)
-    with mp.Pool(processes=n_workers, initializer=_worker_init,
-                 initargs=(str(worker_pkl),)) as _tp:
-        _tp.map(_worker_ping, range(n_workers))
+    print(f"[{ts()}] Iniciando ProcessPoolExecutor…", end=" ", flush=True)
+    with ProcessPoolExecutor(max_workers=n_workers, initializer=_worker_init,
+                             initargs=(str(worker_pkl),)) as _tp:
+        list(_tp.map(_worker_ping, range(n_workers)))
     print(f"✓ {n_workers} workers listos\n")
 
     # ── Random search ─────────────────────────────────────────────────────────
@@ -1249,8 +1249,8 @@ def main():
           f"{n_workers * SEG_SIZE:,} combos/ronda\n")
 
     initargs = (str(worker_pkl),)
-    with mp.Pool(processes=n_workers, initializer=_worker_init,
-                 initargs=initargs, maxtasksperchild=500) as pool:
+    with ProcessPoolExecutor(max_workers=n_workers, initializer=_worker_init,
+                             initargs=initargs) as pool:
         while processed < args.samples:
             remaining  = args.samples - processed
             n_tasks    = max(1, min(n_workers * 2, remaining // max(SEG_SIZE // 2, 1)))
@@ -1258,7 +1258,7 @@ def main():
             tasks = [{"n": actual_seg, "seed": rng.randint(0, 2**32)}
                      for _ in range(n_tasks)]
             try:
-                batch_results = pool.map(_worker_run_segment, tasks)
+                batch_results = list(pool.map(_worker_run_segment, tasks))
             except Exception as e:
                 print(f"\n[{ts()}] ⚠ Error en pool.map: {e} — continuando…")
                 processed += n_tasks * actual_seg
@@ -1322,10 +1322,10 @@ def main():
         hc_tasks = [{"params": hc_batch[i:i + chunk_sz]}
                     for i in range(0, len(hc_batch), chunk_sz)]
 
-        with mp.Pool(processes=n_workers, initializer=_worker_init,
-                     initargs=initargs, maxtasksperchild=2000) as pool:
+        with ProcessPoolExecutor(max_workers=n_workers, initializer=_worker_init,
+                                 initargs=initargs) as pool:
             try:
-                hc_results = pool.map(_worker_run_hc_segment, hc_tasks)
+                hc_results = list(pool.map(_worker_run_hc_segment, hc_tasks))
                 for seg in hc_results:
                     for r in seg:
                         _add(r, all_results, seen_keys, tf_results)
@@ -1368,10 +1368,7 @@ def main():
 
 
 if __name__ == "__main__":
-    # Requerido en Windows para que los subprocesos spawn no relancen main().
+    # freeze_support() es necesario en ejecutables congelados en Windows.
+    # ProcessPoolExecutor gestiona internamente el método de arranque (spawn/fork).
     mp.freeze_support()
-    # 'fork' evita reinicializar el proceso completo en cada worker (Linux/Mac).
-    # Windows no soporta fork — usa spawn por defecto (seguro en todos los SO).
-    if platform.system() != "Windows":
-        mp.set_start_method("fork", force=True)
     main()
