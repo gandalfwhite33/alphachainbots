@@ -1103,8 +1103,28 @@ def print_summary(global_top: List[dict], tf_tops: Dict[str, List[dict]],
 
 
 # ─── MAIN ─────────────────────────────────────────────────────────────────────
+def _dl_task(coin: str, tf: str, cache_dir: Path, days: int) -> Tuple[str, str, Optional[np.ndarray]]:
+    """Descarga (o carga del caché) las velas para un par coin/TF."""
+    arr = load_or_fetch(cache_dir, coin, tf, days)
+    return coin, tf, arr
+
+
+def _add(r: dict, all_results: list, seen_keys: set, tf_results: dict) -> None:
+    """Añade un resultado a all_results si no es duplicado."""
+    if not r or r.get("total_trades", 0) == 0:
+        return
+    p   = {k: v for k, v in r.items() if k in _PARAM_FIELDS_SET}
+    key = hashlib.md5(json.dumps(p, sort_keys=True).encode()).hexdigest()
+    if key in seen_keys:
+        return
+    seen_keys.add(key)
+    all_results.append(r)
+    tf = r.get("interval")
+    if tf in tf_results:
+        tf_results[tf].append(r)
+
+
 def main():
-    mp.freeze_support()
 
     parser = argparse.ArgumentParser(description="AlphaChainBots Optimizer v3")
     parser.add_argument("--days",    type=int,  default=365,       help="Días de historial")
@@ -1163,12 +1183,8 @@ def main():
     dl_ok = 0
     dl_fail = 0
 
-    def _dl_task(coin: str, tf: str) -> Tuple[str, str, Optional[np.ndarray]]:
-        arr = load_or_fetch(cache_dir, coin, tf, args.days)
-        return coin, tf, arr
-
     with ThreadPoolExecutor(max_workers=min(total_tasks, 20)) as ex:
-        futures = {ex.submit(_dl_task, coin, tf): (coin, tf)
+        futures = {ex.submit(_dl_task, coin, tf, cache_dir, args.days): (coin, tf)
                    for tf in TIMEFRAMES for coin in COINS}
         for fut in as_completed(futures):
             coin, tf_key = futures[fut]
@@ -1204,20 +1220,6 @@ def main():
         _tp.map(_worker_ping, range(n_workers))
     print(f"✓ {n_workers} workers listos\n")
 
-    # ── Helper para añadir resultado ──────────────────────────────────────────
-    def _add(r: dict):
-        if not r or r.get("total_trades", 0) == 0:
-            return
-        p   = {k: v for k, v in r.items() if k in _PARAM_FIELDS_SET}
-        key = hashlib.md5(json.dumps(p, sort_keys=True).encode()).hexdigest()
-        if key in seen_keys:
-            return
-        seen_keys.add(key)
-        all_results.append(r)
-        tf = r.get("interval")
-        if tf in tf_results:
-            tf_results[tf].append(r)
-
     # ── Random search ─────────────────────────────────────────────────────────
     rng        = random.Random(42)
     start_time = time.time()
@@ -1250,7 +1252,7 @@ def main():
                 continue
             for seg in batch_results:
                 for r in seg:
-                    _add(r)
+                    _add(r, all_results, seen_keys, tf_results)
             processed += sum(t["n"] for t in tasks)
 
             # Progress
@@ -1313,7 +1315,7 @@ def main():
                 hc_results = pool.map(_worker_run_hc_segment, hc_tasks)
                 for seg in hc_results:
                     for r in seg:
-                        _add(r)
+                        _add(r, all_results, seen_keys, tf_results)
                 processed += len(hc_batch)
             except Exception as e:
                 print(f"\n[{ts()}] ⚠ Error HC pool.map: {e} — continuando…")
@@ -1353,6 +1355,8 @@ def main():
 
 
 if __name__ == "__main__":
+    # Requerido en Windows para que los subprocesos spawn no relancen main().
+    mp.freeze_support()
     # 'fork' evita reinicializar el proceso completo en cada worker (Linux/Mac).
     # Windows no soporta fork — usa spawn por defecto (seguro en todos los SO).
     if platform.system() != "Windows":
