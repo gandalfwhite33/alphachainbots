@@ -29,8 +29,13 @@ MAX_TRADES      = 100
 
 INTERVAL_MS = {
     "1m": 60_000, "5m": 300_000, "15m": 900_000,
-    "30m": 1_800_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000,
+    "30m": 1_800_000, "1h": 3_600_000, "2h": 7_200_000,
+    "4h": 14_400_000, "1d": 86_400_000,
 }
+
+# Filtros de sesión horaria (UTC)
+_LONDON_NY = set(range(7, 22))   # 07:00–21:59 UTC
+_ASIA      = set(range(0, 9))    # 00:00–08:59 UTC
 
 FALLBACK_COINS = ["BTC", "ETH", "SOL", "HYPE", "TAO", "XRP", "DOGE", "AVAX", "BNB", "LINK"]
 _HL_URL = "https://api.hyperliquid.xyz/info"
@@ -66,6 +71,14 @@ class BotConfig:
     idx:            int   = 0
     require_fib:    bool  = True
     require_sr:     bool  = True
+    # ── Filtros avanzados (nuevos bots) ────────────────────────────────────
+    sl_type:        str   = "trailing"  # "trailing" | "fixed" | "atr"
+    fixed_sl_pct:   float = 0.02        # para sl_type == "fixed"
+    rsi_filter:     str   = "none"      # "none" | "rsi50" | "rsi55"
+    ema200_filter:  str   = "none"      # "none" | "strict"
+    atr_filter:     str   = "none"      # "none" | "max"
+    time_filter:    str   = "none"      # "none" | "london_ny" | "asia"
+    liq_confirm:    bool  = False       # confirmar con zona de liquidación cercana
 
 
 CONFIGS = [
@@ -188,6 +201,101 @@ CONFIGS = [
         trailing_pct=0.008,        min_vol_ratio=1.1, sr_near_pct=0.008,
         fibo_zone_pct=0.011,       candle_limit=250,  leverage=5.0,
         require_fib=False,         require_sr=False,
+    ),
+    # ── Conservadores ──────────────────────────────────────────────────────────
+    BotConfig(idx=26,
+        name="bot_2h_cons",    label="BOT·2H·CONS",
+        interval="2h",         ma_type="ema",  ma_fast=20,  ma_slow=50,
+        trailing_pct=0.008,    min_vol_ratio=1.2, sr_near_pct=0.010,
+        fibo_zone_pct=0.012,   candle_limit=250,  leverage=10.0,
+        require_fib=False,     require_sr=False,
+        sl_type="trailing",    rsi_filter="rsi50",
+        atr_filter="max",      time_filter="asia",
+    ),
+    BotConfig(idx=27,
+        name="bot_1h_cons",    label="BOT·1H·CONS",
+        interval="1h",         ma_type="sma",  ma_fast=100, ma_slow=200,
+        trailing_pct=0.010,    min_vol_ratio=1.2, sr_near_pct=0.010,
+        fibo_zone_pct=0.012,   candle_limit=300,  leverage=10.0,
+        require_fib=False,     require_sr=False,
+        sl_type="fixed",       fixed_sl_pct=0.02,
+        rsi_filter="rsi55",    ema200_filter="strict",
+        time_filter="london_ny",
+    ),
+    BotConfig(idx=28,
+        name="bot_4h_cons",    label="BOT·4H·CONS",
+        interval="4h",         ma_type="sma",  ma_fast=100, ma_slow=200,
+        trailing_pct=0.015,    min_vol_ratio=1.2, sr_near_pct=0.012,
+        fibo_zone_pct=0.015,   candle_limit=300,  leverage=10.0,
+        require_fib=False,     require_sr=False,
+        sl_type="fixed",       fixed_sl_pct=0.03,
+        rsi_filter="rsi55",    ema200_filter="strict",
+        time_filter="asia",
+    ),
+    # ── Equilibrados ───────────────────────────────────────────────────────────
+    BotConfig(idx=29,
+        name="bot_2h_eq",      label="BOT·2H·EQ",
+        interval="2h",         ma_type="ema",  ma_fast=20,  ma_slow=50,
+        trailing_pct=0.010,    min_vol_ratio=1.2, sr_near_pct=0.010,
+        fibo_zone_pct=0.012,   candle_limit=250,  leverage=15.0,
+        require_fib=False,     require_sr=False,
+        sl_type="trailing",    rsi_filter="rsi55",
+        atr_filter="max",      time_filter="asia",
+    ),
+    BotConfig(idx=30,
+        name="bot_1h_eq",      label="BOT·1H·EQ",
+        interval="1h",         ma_type="ema",  ma_fast=13,  ma_slow=34,
+        trailing_pct=0.030,    min_vol_ratio=1.2, sr_near_pct=0.010,
+        fibo_zone_pct=0.012,   candle_limit=200,  leverage=10.0,
+        require_fib=False,     require_sr=False,
+        sl_type="trailing",    rsi_filter="rsi50",
+        time_filter="asia",
+    ),
+    BotConfig(idx=31,
+        name="bot_30m_eq",     label="BOT·30M·EQ",
+        interval="30m",        ma_type="sma",  ma_fast=50,  ma_slow=100,
+        trailing_pct=0.008,    min_vol_ratio=1.2, sr_near_pct=0.008,
+        fibo_zone_pct=0.011,   candle_limit=250,  leverage=10.0,
+        require_fib=False,     require_sr=False,
+        sl_type="fixed",       fixed_sl_pct=0.01,
+        ema200_filter="strict", time_filter="asia",
+    ),
+    BotConfig(idx=32,
+        name="bot_4h_eq",      label="BOT·4H·EQ",
+        interval="4h",         ma_type="ema",  ma_fast=20,  ma_slow=50,
+        trailing_pct=0.005,    min_vol_ratio=1.2, sr_near_pct=0.010,
+        fibo_zone_pct=0.015,   candle_limit=200,  leverage=15.0,
+        require_fib=False,     require_sr=False,
+        sl_type="atr",         rsi_filter="rsi50",
+        time_filter="london_ny",
+    ),
+    # ── Alta frecuencia ────────────────────────────────────────────────────────
+    BotConfig(idx=33,
+        name="bot_15m_hf",     label="BOT·15M·HF",
+        interval="15m",        ma_type="sma",  ma_fast=50,  ma_slow=100,
+        trailing_pct=0.030,    min_vol_ratio=1.1, sr_near_pct=0.007,
+        fibo_zone_pct=0.010,   candle_limit=300,  leverage=15.0,
+        require_fib=False,     require_sr=False,
+        sl_type="trailing",    liq_confirm=True,
+    ),
+    BotConfig(idx=34,
+        name="bot_15m_hf2",    label="BOT·15M·HF2",
+        interval="15m",        ma_type="sma",  ma_fast=50,  ma_slow=100,
+        trailing_pct=0.020,    min_vol_ratio=1.1, sr_near_pct=0.007,
+        fibo_zone_pct=0.010,   candle_limit=300,  leverage=10.0,
+        require_fib=False,     require_sr=False,
+        sl_type="trailing",    rsi_filter="rsi50",
+        ema200_filter="strict", time_filter="london_ny",
+    ),
+    BotConfig(idx=35,
+        name="bot_30m_hf",     label="BOT·30M·HF",
+        interval="30m",        ma_type="sma",  ma_fast=100, ma_slow=200,
+        trailing_pct=0.008,    min_vol_ratio=1.1, sr_near_pct=0.008,
+        fibo_zone_pct=0.011,   candle_limit=300,  leverage=10.0,
+        require_fib=False,     require_sr=False,
+        sl_type="fixed",       fixed_sl_pct=0.02,
+        rsi_filter="rsi50",    liq_confirm=True,
+        time_filter="asia",
     ),
 ]
 
@@ -434,6 +542,15 @@ def add_mas(df: pd.DataFrame, cfg: BotConfig) -> pd.DataFrame:
     else:
         df["ma_fast"] = df["close"].rolling(cfg.ma_fast).mean()
         df["ma_slow"] = df["close"].rolling(cfg.ma_slow).mean()
+    if cfg.ema200_filter != "none":
+        df["ema200"] = df["close"].ewm(span=200, adjust=False).mean()
+    if cfg.atr_filter != "none" or cfg.sl_type == "atr":
+        hl = df["high"] - df["low"]
+        hc = (df["high"] - df["close"].shift()).abs()
+        lc = (df["low"]  - df["close"].shift()).abs()
+        tr = pd.concat([hl, hc, lc], axis=1).max(axis=1)
+        df["atr"]    = tr.ewm(com=13, adjust=False).mean()
+        df["atr_ma"] = df["atr"].rolling(20).mean()
     return df
 
 
@@ -585,16 +702,18 @@ class VirtualPortfolio:
     def total_pnl_pct(self) -> float:
         return self.total_pnl / INITIAL_EQUITY * 100
 
-    def open(self, coin: str, direction: str, price: float, cfg: BotConfig) -> bool:
+    def open(self, coin: str, direction: str, price: float, cfg: BotConfig,
+             trailing_pct_override: Optional[float] = None) -> bool:
         with self._lock:
             if coin in self.positions or price <= 0:
                 return False
             notional = self.equity * 0.95 * cfg.risk_per_trade * cfg.leverage
             size = round(notional / price, 6)
+            tp = trailing_pct_override if trailing_pct_override is not None else cfg.trailing_pct
             self.positions[coin] = VirtualPos(
                 coin=coin, direction=direction, size=size,
                 entry_price=price, current_price=price,
-                trailing_stop=TrailingStop(price, direction, cfg.trailing_pct),
+                trailing_stop=TrailingStop(price, direction, tp),
             )
             return True
 
@@ -678,8 +797,16 @@ class SimBot:
         d   = pos.direction
         cfg = self.cfg
 
-        if pos.trailing_stop.triggered(price):
-            return f"Trailing Stop ({pos.trailing_stop.stop:.4f})"
+        # Stop loss según tipo configurado
+        if cfg.sl_type == "fixed":
+            sl = pos.entry_price * (1 - cfg.fixed_sl_pct) if d == "long" \
+                 else pos.entry_price * (1 + cfg.fixed_sl_pct)
+            if (d == "long" and price <= sl) or (d == "short" and price >= sl):
+                return f"Fixed SL {cfg.fixed_sl_pct*100:.0f}% ({sl:.4f})"
+        else:
+            # trailing o atr — ambos usan TrailingStop
+            if pos.trailing_stop.triggered(price):
+                return f"Trailing Stop ({pos.trailing_stop.stop:.4f})"
 
         v = df.dropna(subset=["ma_fast", "ma_slow"])
         if len(v) >= 3:
@@ -708,6 +835,15 @@ class SimBot:
         self.status    = "escaneando"
         cfg = self.cfg
 
+        # ── Filtro de sesión horaria (aplica a todo el ciclo) ─────────────────
+        hour_utc = datetime.utcnow().hour
+        if cfg.time_filter == "london_ny" and hour_utc not in _LONDON_NY:
+            self.status = "esperando"
+            return
+        if cfg.time_filter == "asia" and hour_utc not in _ASIA:
+            self.status = "esperando"
+            return
+
         for coin in self.coins:
             try:
                 df = fetch_candles(coin, cfg.interval, cfg.candle_limit)
@@ -734,7 +870,40 @@ class SimBot:
                 if not signal:
                     continue
 
-                entry = float(df["close"].iloc[-2])
+                entry   = float(df["close"].iloc[-2])
+                rsi_val = float(df["rsi"].iloc[-2])
+
+                # ── Filtro RSI de entrada ─────────────────────────────────────
+                if cfg.rsi_filter == "rsi50":
+                    if signal == "long"  and rsi_val <= 50: continue
+                    if signal == "short" and rsi_val >= 50: continue
+                elif cfg.rsi_filter == "rsi55":
+                    if signal == "long"  and rsi_val <= 55: continue
+                    if signal == "short" and rsi_val >= 45: continue
+
+                # ── Filtro EMA200 ─────────────────────────────────────────────
+                if cfg.ema200_filter == "strict" and "ema200" in df.columns:
+                    ema200 = float(df["ema200"].iloc[-2])
+                    if signal == "long"  and entry < ema200: continue
+                    if signal == "short" and entry > ema200: continue
+
+                # ── Filtro ATR (solo si ATR alto) ─────────────────────────────
+                if cfg.atr_filter == "max" and "atr" in df.columns:
+                    atr_now = float(df["atr"].iloc[-2])
+                    atr_avg = float(df["atr_ma"].iloc[-2]) if not pd.isna(df["atr_ma"].iloc[-2]) else atr_now
+                    if atr_now <= atr_avg:
+                        continue
+
+                # ── Confirmación de liquidaciones ─────────────────────────────
+                if cfg.liq_confirm:
+                    with _mkt_lock:
+                        liq_zones = list(_mkt_cache.get("liq", {}).get(coin, []))
+                    near = any(abs((z["price"] - entry) / entry) <= 0.025
+                               for z in liq_zones if z.get("liq_usd", 0) >= 5e6)
+                    if not near:
+                        self._log_signal(coin, signal.upper(), "DESCARTADO", "sin zona liq cercana")
+                        continue
+
                 highs, lows = find_pivots(df)
                 ok_sr  = near_sr(entry, highs, lows, cfg.sr_near_pct) if cfg.require_sr  else True
                 ok_fib = near_fibo(entry, calc_fibo(df), cfg.fibo_zone_pct) if cfg.require_fib else True
@@ -748,10 +917,18 @@ class SimBot:
                     self._log_signal(coin, signal.upper(), "DESCARTADO", ", ".join(why))
                     continue
 
-                opened = self.portfolio.open(coin, signal, entry, cfg)
+                # Para ATR stop: calcular trailing_pct dinámico desde ATR al momento de entrada
+                tp_override = None
+                if cfg.sl_type == "atr" and "atr" in df.columns:
+                    atr_val    = float(df["atr"].iloc[-2])
+                    tp_override = min(max(atr_val * 2.0 / entry, 0.005), 0.05)
+
+                opened = self.portfolio.open(coin, signal, entry, cfg,
+                                             trailing_pct_override=tp_override)
                 if opened:
+                    sl_info = f" | SL-ATR {tp_override*100:.1f}%" if tp_override else ""
                     self._log_signal(coin, signal.upper(),
-                                     f"ENTRADA @ {entry:,.4f}")
+                                     f"ENTRADA @ {entry:,.4f}{sl_info}")
 
             except Exception as e:
                 self.errors += 1
