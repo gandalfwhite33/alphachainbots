@@ -1369,6 +1369,16 @@ function btRenderTable(bots){
 class DashHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
+        try:
+            self._do_GET_inner()
+        except Exception as exc:
+            log.exception("do_GET unhandled error: %s", exc)
+            try:
+                self._respond(500, "text/plain", b"Internal Server Error")
+            except Exception:
+                pass
+
+    def _do_GET_inner(self):
         path = self.path.split("?")[0]
 
         if path == "/health":
@@ -1410,7 +1420,8 @@ class DashHandler(BaseHTTPRequestHandler):
             self._respond(200, "application/json", b'{"ok":true}')
 
         elif path in ("/", "/index.html"):
-            self._respond(200, "text/html; charset=utf-8", DASHBOARD_HTML.encode("utf-8", errors="replace"))
+            _html = DASHBOARD_HTML.encode("utf-8", errors="ignore").decode("utf-8")
+            self._respond(200, "text/html; charset=utf-8", _html.encode("utf-8", errors="replace"))
 
         else:
             self._respond(404, "text/plain", b"Not Found")
