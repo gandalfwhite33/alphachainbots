@@ -184,11 +184,12 @@ th.srt.asc::after{content:' \25B2'}
 th.srt.desc::after{content:' \25BC'}
 
 /* ── COIN SELECTOR PER CARD ── */
-.coin-sel{display:flex;flex-wrap:wrap;gap:3px;margin:5px 0 3px;padding-top:5px;border-top:1px solid #0d1520;cursor:default}
+.coin-sel{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 3px;padding:6px 0 3px;border-top:1px solid #162030;cursor:default;align-items:center}
+.coin-sel-lbl{font-size:9px;color:#37505f;text-transform:uppercase;letter-spacing:.5px;margin-right:2px;white-space:nowrap}
 .coin-cb{display:none}
-.coin-lbl{padding:2px 6px;border:1px solid #1e3a4a;border-radius:3px;font-size:9px;cursor:pointer;color:#546e7a;background:#07090f;transition:all .15s;user-select:none}
+.coin-lbl{padding:2px 7px;border:1px solid #1e3a4a;border-radius:3px;font-size:10px;cursor:pointer;color:#78909c;background:#07090f;transition:all .15s;user-select:none;font-weight:bold}
 .coin-cb:checked+.coin-lbl{background:#0d2030;border-color:#4fc3f7;color:#4fc3f7}
-.coin-lbl:hover{border-color:#37505f}
+.coin-lbl:hover{border-color:#546e7a;color:#c9d4e0}
 .card-micro{position:relative;height:52px;margin:4px 0 2px}
 .card-filtpnl{font-size:12px;margin-bottom:2px}
 .apply-all-wrap{display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:6px 10px;background:#08101c;border:1px solid #162030;border-radius:6px}
@@ -576,6 +577,7 @@ function render(d){
     const selCoins = _botCoins[b.idx];
     const fStats = _filteredStats(p, selCoins);
     const fPnlCls = pc(fStats.pnl);
+    const hasMini = fStats.hist.length >= 2;
     const coinCbsHtml = ALL_COINS_LIST.map(c=>{
       const chk = selCoins.has(c)?'checked':'';
       return `<input type="checkbox" class="coin-cb coin-cb-${b.idx}" id="cc-${b.idx}-${c}" value="${c}" ${chk} onchange="onCoinChange(${b.idx})"><label class="coin-lbl" for="cc-${b.idx}-${c}">${c}</label>`;
@@ -587,8 +589,8 @@ function render(d){
         <div class="card-eq">$${fmt(p.equity)}</div>
       </div>
       <div id="card-pnl-${b.idx}" class="card-filtpnl ${fPnlCls}">${fp(fStats.pnl)}$ &middot; ${fStats.wr.toFixed(1)}% wr &middot; ${fStats.trades} ops</div>
-      <div class="card-micro"><canvas id="mini-${b.idx}"></canvas></div>
-      <div class="coin-sel" onclick="event.stopPropagation()">${coinCbsHtml}</div>
+      ${hasMini?`<div class="card-micro"><canvas id="mini-${b.idx}"></canvas></div>`:''}
+      <div class="coin-sel" onclick="event.stopPropagation()"><span class="coin-sel-lbl">Monedas:</span>${coinCbsHtml}</div>
       <div class="card-row" style="margin-top:4px">
         <span>${p.positions.length} pos.</span>
         <span>scan: ${b.last_scan}</span>
@@ -596,11 +598,14 @@ function render(d){
       </div>
     </div>`;
   }).join('');
-  // Render mini charts after DOM update
+  // Render mini charts after DOM update (only for bots with enough history)
   requestAnimationFrame(()=>{
-    d.bots.forEach(b=>{ renderMiniChart(b.idx, _filteredStats(b.portfolio, _botCoins[b.idx]||new Set(['BTC'])).hist); });
+    d.bots.forEach(b=>{
+      const hist = _filteredStats(b.portfolio, _botCoins[b.idx]||new Set(['BTC'])).hist;
+      if(hist.length >= 2) renderMiniChart(b.idx, hist);
+    });
   });
-  renderControlCenter(d);
+  try{ renderControlCenter(d); }catch(e){ console.error('[CC]',e); }
 
   // Positions
   const allPos=[];
@@ -733,7 +738,12 @@ function _ccRender(){
     const vb=typeof b2[col]==='string'?b2[col]:+b2[col];
     return va<vb?dir:va>vb?-dir:0;
   });
-  document.getElementById('cc-cnt').textContent=rows.length+' bots';
+  const cnt=document.getElementById('cc-cnt');
+  if(cnt) cnt.textContent=rows.length+' bots';
+  if(!rows.length){
+    tb.innerHTML='<tr><td colspan="11" class="empty">Sin operaciones todav\xEDa \u2014 los datos aparecer\xE1n cuando los bots empiecen a operar.</td></tr>';
+    return;
+  }
   tb.innerHTML=rows.map((r,i)=>{
     const pCls=r.pnl>=0?'up':'dn', sign=r.pnl>=0?'+':'';
     const warn=r.pnl<0?'<span style="color:#ff4466;font-size:10px">\u26A0 Revisar</span>':'<span style="color:#00e676;font-size:10px">OK</span>';
@@ -756,17 +766,21 @@ function _ccRender(){
   }).join('');
 }
 function renderControlCenter(d){
+  if(!d||!d.bots) return;
   _ccData=d.bots.map(b=>{
-    const p=b.portfolio;
-    const initEq=p.equity-(p.total_pnl||0);
+    const p=b.portfolio||{};
+    const equity=p.equity||0;
+    const total_pnl=p.total_pnl||0;
+    const initEq=equity-total_pnl>0?equity-total_pnl:10000;
     const hist=p.history||[];
-    const wr=p.trades>0?p.wins/p.trades*100:0;
-    const dd=_ddFromHist(hist,initEq>0?initEq:10000);
-    const sharpe=_sharpeFromHist(hist,initEq>0?initEq:10000);
+    const trades=p.trades||0, wins=p.wins||0;
+    const wr=trades>0?wins/trades*100:0;
+    const dd=_ddFromHist(hist,initEq);
+    const sharpe=_sharpeFromHist(hist,initEq);
     const pnl_pct=p.total_pnl_pct||0;
     const score=(pnl_pct*wr)/Math.max(dd,1);
-    return {idx:b.idx,label:b.label,cat:ccCat(b.label),interval:b.interval,
-            pnl:p.total_pnl,pnl_pct,wr,dd,sharpe,score};
+    return {idx:b.idx,label:b.label||'',cat:ccCat(b.label||''),
+            interval:b.interval||'',pnl:total_pnl,pnl_pct,wr,dd,sharpe,score};
   });
   _ccRender();
 }
