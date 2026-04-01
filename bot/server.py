@@ -1276,9 +1276,12 @@ function btRenderEquity(bots){
     card.className = 'bt-eq-card';
     const pCls = b.total_pnl>=0?'up':'dn';
     const sign = b.total_pnl>=0?'+':'';
+    const eqDiv = (b.equity_curve && b.equity_curve.length >= 2)
+      ? '<div class="bt-eq-canvas"><canvas id="bteq'+i+'"></canvas></div>'
+      : '';
     card.innerHTML = `
       <div class="bt-eq-title ${COLS[b.idx%18]}">${b.label}</div>
-      <div class="bt-eq-canvas"><canvas id="bteq${i}"></canvas></div>
+      `+eqDiv+`
       <div class="bt-eq-meta">
         <span class="${pCls}">${sign}${b.total_pnl.toFixed(0)}$ (${sign}${b.total_pnl_pct.toFixed(1)}%)</span>
         <span>${b.win_rate}% wr</span>
