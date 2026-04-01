@@ -183,22 +183,21 @@ th.srt:hover{color:#4fc3f7}
 th.srt.asc::after{content:' \25B2'}
 th.srt.desc::after{content:' \25BC'}
 
-/* ── COIN SELECTOR PER CARD ── */
-.coin-sel{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 3px;padding:6px 0 3px;border-top:1px solid #162030;align-items:center}
-.coin-sel-lbl{font-size:9px;color:#37505f;text-transform:uppercase;letter-spacing:.5px;margin-right:2px;white-space:nowrap}
-.coin-btn{padding:2px 7px;border:1px solid #1e3a4a;border-radius:3px;font-size:10px;font-weight:bold;cursor:pointer;color:#546e7a;background:#07090f;font-family:inherit;transition:all .15s;letter-spacing:.3px}
-.coin-btn.active{background:#0d2030;border-color:#4fc3f7;color:#4fc3f7}
-.coin-btn:hover{border-color:#546e7a;color:#c9d4e0}
+/* ── CONTROL BAR ── */
+.ctrl-bar{background:#08101c;border:1px solid #162030;border-radius:6px;margin-bottom:12px;padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ctrl-group{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.ctrl-lbl{font-size:9px;color:#37505f;text-transform:uppercase;letter-spacing:1px;white-space:nowrap;margin-right:2px}
+.ctrl-btn{padding:3px 10px;border:1px solid #1e3a4a;border-radius:3px;font-size:11px;font-weight:bold;cursor:pointer;color:#546e7a;background:#0a0f1c;font-family:inherit;transition:all .2s;letter-spacing:.5px}
+.ctrl-btn.active{background:#0d2030;border-color:#4fc3f7;color:#4fc3f7}
+.ctrl-btn:hover{border-color:#37505f;color:#c9d4e0}
+.ctrl-sep{width:1px;background:#162030;align-self:stretch;margin:0 4px}
+.ctrl-apply{padding:5px 18px;border:1px solid #1e4a2a;border-radius:3px;font-size:12px;font-weight:bold;cursor:pointer;background:#071207;color:#69f0ae;font-family:inherit;transition:all .2s}
+.ctrl-apply:hover{border-color:#69f0ae;background:#0a1a0a}
+.ctrl-tag{font-size:10px;color:#37505f;margin-left:6px;letter-spacing:.3px}
+/* ── CARD STATS ── */
 .card-micro{position:relative;height:52px;margin:4px 0 2px}
 .card-filtpnl{font-size:12px;margin-bottom:2px}
-/* ── APPLY ALL BAR ── */
-.apply-all-wrap{display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:7px 12px;background:#08101c;border:1px solid #162030;border-radius:6px;flex-wrap:wrap}
-.apply-all-wrap .flt-lbl{white-space:nowrap;margin-right:4px}
-.gcoin-btn{padding:3px 9px;border:1px solid #1e3a4a;border-radius:3px;font-size:10px;font-weight:bold;cursor:pointer;color:#546e7a;background:#07090f;font-family:inherit;transition:all .15s}
-.gcoin-btn.active{background:#0d2030;border-color:#4fc3f7;color:#4fc3f7}
-.gcoin-btn:hover{border-color:#546e7a;color:#c9d4e0}
-.apply-all-btn{padding:4px 14px;border:1px solid #1e4a2a;border-radius:3px;font-size:11px;font-weight:bold;cursor:pointer;background:#071207;color:#69f0ae;font-family:inherit;transition:all .2s;white-space:nowrap;margin-left:6px}
-.apply-all-btn:hover{border-color:#69f0ae;background:#0a1a0a}
+.card-tag{font-size:9px;color:#37505f;margin-top:3px;letter-spacing:.2px}
 </style>
 </head>
 <body>
@@ -339,16 +338,39 @@ th.srt.desc::after{content:' \25BC'}
   </div>
   <!-- ── FIN MARKET DATA ─────────────────────────────────────────────────── -->
 
+  <!-- ── CONTROL BAR ─────────────────────────────────────────────────────── -->
+  <div class="ctrl-bar" id="ctrl-bar">
+    <div class="ctrl-group">
+      <span class="ctrl-lbl">Periodo:</span>
+      <button class="ctrl-btn active" onclick="selectPeriod('3m',this)">3M</button>
+      <button class="ctrl-btn" onclick="selectPeriod('6m',this)">6M</button>
+      <button class="ctrl-btn" onclick="selectPeriod('1y',this)">1A</button>
+      <button class="ctrl-btn" onclick="selectPeriod('max',this)">M&Aacute;X</button>
+    </div>
+    <div class="ctrl-sep"></div>
+    <div class="ctrl-group">
+      <span class="ctrl-lbl">Monedas:</span>
+      <button class="ctrl-btn active" onclick="toggleCtrlCoin('BTC',this)">BTC</button>
+      <button class="ctrl-btn" onclick="toggleCtrlCoin('ETH',this)">ETH</button>
+      <button class="ctrl-btn" onclick="toggleCtrlCoin('SOL',this)">SOL</button>
+      <button class="ctrl-btn" onclick="toggleCtrlCoin('ARB',this)">ARB</button>
+      <button class="ctrl-btn" onclick="toggleCtrlCoin('OP',this)">OP</button>
+      <button class="ctrl-btn" onclick="toggleCtrlCoin('AVAX',this)">AVAX</button>
+      <button class="ctrl-btn" onclick="toggleCtrlCoin('DOGE',this)">DOGE</button>
+      <button class="ctrl-btn" onclick="toggleCtrlCoin('WIF',this)">WIF</button>
+      <button class="ctrl-btn" onclick="toggleCtrlCoin('SUI',this)">SUI</button>
+    </div>
+    <div class="ctrl-sep"></div>
+    <button class="ctrl-apply" onclick="applyControl()">&#x25BA; Aplicar</button>
+    <span class="ctrl-tag" id="ctrl-tag">&#x1F4CA; BTC &middot; 3M</span>
+  </div>
+  <!-- ── FIN CONTROL BAR ──────────────────────────────────────────────────── -->
+
   <!-- ── BACKTEST SECTION ────────────────────────────────────────────────── -->
   <div class="panel" id="bt-section">
     <div class="ph bt-ph">
       <span>&#x1F4CA; Backtest Hist&oacute;rico</span>
-      <div class="bt-tabs">
-        <button class="bt-tab active" onclick="btLoad('3m')">3M</button>
-        <button class="bt-tab" onclick="btLoad('6m')">6M</button>
-        <button class="bt-tab" onclick="btLoad('1y')">1A</button>
-        <button class="bt-tab" onclick="btLoad('max')">M&Aacute;X</button>
-      </div>
+      <span class="ph-cnt" id="bt-period-hdr"></span>
     </div>
     <div style="padding:10px 10px 4px" id="bt-prog-wrap">
       <div class="bt-pbar-bg"><div class="bt-pbar-fill" id="bt-pbar" style="width:0%"></div></div>
@@ -431,21 +453,6 @@ th.srt.desc::after{content:' \25BC'}
     <button class="flt-btn" onclick="applyFilter('1h',this)">1h</button>
     <button class="flt-btn" onclick="applyFilter('4h',this)">4h</button>
     <button class="flt-btn" onclick="applyFilter('liq',this)">Liquidaciones</button>
-  </div>
-
-  <!-- ── APPLY ALL COIN SELECTOR ──────────────────────────────────────────── -->
-  <div class="apply-all-wrap">
-    <span class="flt-lbl">Monedas globales:</span>
-    <button class="gcoin-btn active" onclick="toggleGCoin('BTC',this)">BTC</button>
-    <button class="gcoin-btn" onclick="toggleGCoin('ETH',this)">ETH</button>
-    <button class="gcoin-btn" onclick="toggleGCoin('SOL',this)">SOL</button>
-    <button class="gcoin-btn" onclick="toggleGCoin('ARB',this)">ARB</button>
-    <button class="gcoin-btn" onclick="toggleGCoin('OP',this)">OP</button>
-    <button class="gcoin-btn" onclick="toggleGCoin('AVAX',this)">AVAX</button>
-    <button class="gcoin-btn" onclick="toggleGCoin('DOGE',this)">DOGE</button>
-    <button class="gcoin-btn" onclick="toggleGCoin('WIF',this)">WIF</button>
-    <button class="gcoin-btn" onclick="toggleGCoin('SUI',this)">SUI</button>
-    <button class="apply-all-btn" onclick="applyAllCoins()">&#x25BA; Aplicar a todos</button>
   </div>
 
   <div class="grid3" id="bot-cards">
@@ -557,50 +564,40 @@ function render(d){
   document.getElementById('exec-pos-sub').textContent = nPos+'/'+nTot+' bots';
 
   // ── Bot cards ─────────────────────────────────────────────────────────────
-  const ALL_COINS_LIST = ['BTC','ETH','SOL','ARB','OP','AVAX','DOGE','WIF','SUI'];
+  const coinTag = [..._ctrlCoins].join(' \xB7 ');
+  const periodTag = _ctrlPeriod ? _ctrlPeriod.toUpperCase() : '3M';
   document.getElementById('bot-cards').innerHTML=d.bots.map((b,i)=>{
     const p=b.portfolio, cc=COLS[b.idx%18], cv=CARDS[b.idx%18];
-    const ma=b.ma_type==='liq'?`LIQ·${b.strategy||''}`.toUpperCase()
-             :(b.ma_type==='ema'?'EMA':'SMA')+` ${b.ma_fast}/${b.ma_slow}`;
+    const ma=b.ma_type==='liq'?'LIQ\xB7'+(b.strategy||'').toUpperCase()
+             :(b.ma_type==='ema'?'EMA':'SMA')+' '+b.ma_fast+'/'+b.ma_slow;
     const tr=(b.trailing_pct*100).toFixed(1);
-    const pc2=pc(p.total_pnl);
     const sBadge=b.status==='escaneando'
       ?'<span class="b b-entry">SCAN</span>'
       :'<span class="b b-wait">'+b.status+'</span>';
     const bType = b.ma_type==='liq'?'liq':'ema';
     const firstCoin = (b.coins&&b.coins[0])||'BTC';
-    // Coin selection state (persists across renders)
-    if(!_botCoins[b.idx]){
-      _botCoins[b.idx] = b.coins&&b.coins.includes('BTC') ? new Set(['BTC']) : new Set([(b.coins&&b.coins[0])||'BTC']);
-    }
-    const selCoins = _botCoins[b.idx];
-    const fStats = _filteredStats(p, selCoins);
+    const fStats = _filteredStats(p, _ctrlCoins);
     const fPnlCls = pc(fStats.pnl);
     const hasMini = fStats.hist.length >= 2;
-    const coinBtnsHtml = ALL_COINS_LIST.map(c=>{
-      const act = selCoins.has(c)?' active':'';
-      return `<button class="coin-btn${act}" onclick="event.stopPropagation();toggleCoin(${b.idx},'${c}',this)">${c}</button>`;
-    }).join('');
-    return `<div class="card ${cv}" data-interval="${b.interval}" data-pnl-pos="${p.total_pnl>=0?1:0}" data-type="${bType}">
-      <div style="cursor:pointer" onclick="openTVModal('${firstCoin}','${b.interval}','${b.label}')">
-        <div class="card-name ${cc}">${b.label} ${sBadge}</div>
-        <div class="card-meta">${ma} &middot; ${b.interval} &middot; trailing ${tr}%</div>
-        <div class="card-eq">$${fmt(p.equity)}</div>
-      </div>
-      <div id="card-pnl-${b.idx}" class="card-filtpnl ${fPnlCls}">${fp(fStats.pnl)}$ &middot; ${fStats.wr.toFixed(1)}% wr &middot; ${fStats.trades} ops</div>
-      ${hasMini?`<div class="card-micro"><canvas id="mini-${b.idx}"></canvas></div>`:''}
-      <div class="coin-sel"><span class="coin-sel-lbl">Monedas:</span>${coinBtnsHtml}</div>
-      <div class="card-row" style="margin-top:4px">
+    return `<div class="card ${cv}" data-interval="${b.interval}" data-pnl-pos="${p.total_pnl>=0?1:0}" data-type="${bType}"
+      onclick="openTVModal('${firstCoin}','${b.interval}','${b.label}')">
+      <div class="card-name ${cc}">${b.label} ${sBadge}</div>
+      <div class="card-meta">${ma} &middot; ${b.interval} &middot; trailing ${tr}%</div>
+      <div class="card-eq">$${fmt(p.equity)}</div>
+      <div class="card-pnl ${fPnlCls}">${fp(fStats.pnl)}$ (${fStats.wr.toFixed(1)}% wr &middot; ${fStats.trades} ops)</div>
+      <div class="card-row">
         <span>${p.positions.length} pos.</span>
         <span>scan: ${b.last_scan}</span>
         ${b.errors?`<span class="dn">${b.errors} err</span>`:''}
       </div>
+      ${hasMini?`<div class="card-micro"><canvas id="mini-${b.idx}"></canvas></div>`:''}
+      <div class="card-tag">\uD83D\uDCCA ${coinTag} | ${periodTag}</div>
     </div>`;
   }).join('');
-  // Render mini charts after DOM update (only for bots with enough history)
+  // Render mini charts after DOM update
   requestAnimationFrame(()=>{
     d.bots.forEach(b=>{
-      const hist = _filteredStats(b.portfolio, _botCoins[b.idx]||new Set(['BTC'])).hist;
+      const hist = _filteredStats(b.portfolio, _ctrlCoins).hist;
       if(hist.length >= 2) renderMiniChart(b.idx, hist);
     });
   });
@@ -794,8 +791,42 @@ function renderControlCenter(d){
   _ccRender();
 }
 
-// ── COIN SELECTOR / MICRO CHARTS ─────────────────────────────────────────────
-const _botCoins={};
+// ── CONTROL BAR STATE ─────────────────────────────────────────────────────────
+let _ctrlPeriod = '3m';
+const _ctrlCoins = new Set(['BTC']);
+
+function selectPeriod(p, btn){
+  _ctrlPeriod = p;
+  document.querySelectorAll('#ctrl-bar .ctrl-group:first-child .ctrl-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function toggleCtrlCoin(coin, btn){
+  if(_ctrlCoins.has(coin)){
+    if(_ctrlCoins.size===1) return; // at least 1 required
+    _ctrlCoins.delete(coin);
+    btn.classList.remove('active');
+  } else {
+    _ctrlCoins.add(coin);
+    btn.classList.add('active');
+  }
+}
+
+function applyControl(){
+  // Update tag in ctrl-bar
+  const coinTag = [..._ctrlCoins].join(' \xB7 ');
+  const tEl = document.getElementById('ctrl-tag');
+  if(tEl) tEl.textContent = '\uD83D\uDCCA '+coinTag+' | '+(_ctrlPeriod||'3m').toUpperCase();
+  // Update bt-section header label
+  const hEl = document.getElementById('bt-period-hdr');
+  if(hEl) hEl.textContent = (_ctrlPeriod||'3m').toUpperCase()+' \xB7 '+coinTag;
+  // Run backtest for selected period
+  if(_ctrlPeriod) btLoad(_ctrlPeriod);
+  // Re-render bot cards with new coin filter
+  if(_lastD) render(_lastD);
+}
+
+// ── MICRO CHARTS ──────────────────────────────────────────────────────────────
 const _miniCharts={};
 
 function _filteredStats(portfolio, coinSet){
@@ -823,56 +854,6 @@ function renderMiniChart(idx,hist){
       plugins:{legend:{display:false},tooltip:{enabled:false}},
       scales:{x:{display:false},y:{display:false}}}
   });
-}
-
-// Toggle a coin button on a specific bot card
-function toggleCoin(idx, coin, btn){
-  if(!_botCoins[idx]) _botCoins[idx]=new Set(['BTC']);
-  const sel=_botCoins[idx];
-  if(sel.has(coin)){
-    if(sel.size===1) return; // at least 1 coin required
-    sel.delete(coin);
-    btn.classList.remove('active');
-  } else {
-    sel.add(coin);
-    btn.classList.add('active');
-  }
-  _updateCardStats(idx);
-}
-
-// Toggle a coin in the global selector bar
-const _gCoins=new Set(['BTC']);
-function toggleGCoin(coin, btn){
-  if(_gCoins.has(coin)){
-    if(_gCoins.size===1) return;
-    _gCoins.delete(coin);
-    btn.classList.remove('active');
-  } else {
-    _gCoins.add(coin);
-    btn.classList.add('active');
-  }
-}
-
-// Update PnL/WinRate/mini chart for one bot card without full re-render
-function _updateCardStats(idx){
-  if(!_lastD) return;
-  const b=_lastD.bots.find(x=>x.idx===idx);
-  if(!b) return;
-  const fStats=_filteredStats(b.portfolio,_botCoins[idx]);
-  const pEl=document.getElementById('card-pnl-'+idx);
-  if(pEl){
-    const cls=fStats.pnl>=0?'up':'dn';
-    pEl.className='card-filtpnl '+cls;
-    pEl.textContent=(fStats.pnl>=0?'+':'')+fStats.pnl.toFixed(2)+'$ \xB7 '+fStats.wr.toFixed(1)+'% wr \xB7 '+fStats.trades+' ops';
-  }
-  if(fStats.hist.length>=2) renderMiniChart(idx,fStats.hist);
-}
-
-// Apply global coin selection to all bot cards
-function applyAllCoins(){
-  if(_gCoins.size===0||!_lastD) return;
-  _lastD.bots.forEach(b=>{_botCoins[b.idx]=new Set(_gCoins);});
-  render(_lastD);
 }
 
 function startCD(){
