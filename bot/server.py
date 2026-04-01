@@ -184,21 +184,20 @@ th.srt.asc::after{content:' \25B2'}
 th.srt.desc::after{content:' \25BC'}
 
 /* ── COIN SELECTOR PER CARD ── */
-.coin-sel{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 3px;padding:6px 0 3px;border-top:1px solid #162030;cursor:default;align-items:center}
+.coin-sel{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 3px;padding:6px 0 3px;border-top:1px solid #162030;align-items:center}
 .coin-sel-lbl{font-size:9px;color:#37505f;text-transform:uppercase;letter-spacing:.5px;margin-right:2px;white-space:nowrap}
-.coin-cb{display:none}
-.coin-lbl{padding:2px 7px;border:1px solid #1e3a4a;border-radius:3px;font-size:10px;cursor:pointer;color:#78909c;background:#07090f;transition:all .15s;user-select:none;font-weight:bold}
-.coin-cb:checked+.coin-lbl{background:#0d2030;border-color:#4fc3f7;color:#4fc3f7}
-.coin-lbl:hover{border-color:#546e7a;color:#c9d4e0}
+.coin-btn{padding:2px 7px;border:1px solid #1e3a4a;border-radius:3px;font-size:10px;font-weight:bold;cursor:pointer;color:#546e7a;background:#07090f;font-family:inherit;transition:all .15s;letter-spacing:.3px}
+.coin-btn.active{background:#0d2030;border-color:#4fc3f7;color:#4fc3f7}
+.coin-btn:hover{border-color:#546e7a;color:#c9d4e0}
 .card-micro{position:relative;height:52px;margin:4px 0 2px}
 .card-filtpnl{font-size:12px;margin-bottom:2px}
-.apply-all-wrap{display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:6px 10px;background:#08101c;border:1px solid #162030;border-radius:6px}
-.apply-all-wrap .flt-lbl{white-space:nowrap}
-.global-coin-cb{display:none}
-.global-coin-lbl{padding:3px 9px;border:1px solid #1e3a4a;border-radius:3px;font-size:10px;cursor:pointer;color:#546e7a;background:#07090f;transition:all .15s;user-select:none}
-.global-coin-cb:checked+.global-coin-lbl{background:#0d2030;border-color:#4fc3f7;color:#4fc3f7}
-.global-coin-lbl:hover{border-color:#37505f}
-.apply-all-btn{padding:4px 14px;border:1px solid #1e4a2a;border-radius:3px;font-size:11px;font-weight:bold;cursor:pointer;background:#071207;color:#69f0ae;font-family:inherit;transition:all .2s;white-space:nowrap}
+/* ── APPLY ALL BAR ── */
+.apply-all-wrap{display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:7px 12px;background:#08101c;border:1px solid #162030;border-radius:6px;flex-wrap:wrap}
+.apply-all-wrap .flt-lbl{white-space:nowrap;margin-right:4px}
+.gcoin-btn{padding:3px 9px;border:1px solid #1e3a4a;border-radius:3px;font-size:10px;font-weight:bold;cursor:pointer;color:#546e7a;background:#07090f;font-family:inherit;transition:all .15s}
+.gcoin-btn.active{background:#0d2030;border-color:#4fc3f7;color:#4fc3f7}
+.gcoin-btn:hover{border-color:#546e7a;color:#c9d4e0}
+.apply-all-btn{padding:4px 14px;border:1px solid #1e4a2a;border-radius:3px;font-size:11px;font-weight:bold;cursor:pointer;background:#071207;color:#69f0ae;font-family:inherit;transition:all .2s;white-space:nowrap;margin-left:6px}
 .apply-all-btn:hover{border-color:#69f0ae;background:#0a1a0a}
 </style>
 </head>
@@ -434,18 +433,18 @@ th.srt.desc::after{content:' \25BC'}
     <button class="flt-btn" onclick="applyFilter('liq',this)">Liquidaciones</button>
   </div>
 
-  <!-- ── GLOBAL COIN SELECTOR ─────────────────────────────────────────────── -->
+  <!-- ── APPLY ALL COIN SELECTOR ──────────────────────────────────────────── -->
   <div class="apply-all-wrap">
-    <span class="flt-lbl">Aplicar monedas:</span>
-    <input type="checkbox" class="global-coin-cb" id="gc-BTC" value="BTC" checked><label class="global-coin-lbl" for="gc-BTC">BTC</label>
-    <input type="checkbox" class="global-coin-cb" id="gc-ETH" value="ETH"><label class="global-coin-lbl" for="gc-ETH">ETH</label>
-    <input type="checkbox" class="global-coin-cb" id="gc-SOL" value="SOL"><label class="global-coin-lbl" for="gc-SOL">SOL</label>
-    <input type="checkbox" class="global-coin-cb" id="gc-ARB" value="ARB"><label class="global-coin-lbl" for="gc-ARB">ARB</label>
-    <input type="checkbox" class="global-coin-cb" id="gc-OP" value="OP"><label class="global-coin-lbl" for="gc-OP">OP</label>
-    <input type="checkbox" class="global-coin-cb" id="gc-AVAX" value="AVAX"><label class="global-coin-lbl" for="gc-AVAX">AVAX</label>
-    <input type="checkbox" class="global-coin-cb" id="gc-DOGE" value="DOGE"><label class="global-coin-lbl" for="gc-DOGE">DOGE</label>
-    <input type="checkbox" class="global-coin-cb" id="gc-WIF" value="WIF"><label class="global-coin-lbl" for="gc-WIF">WIF</label>
-    <input type="checkbox" class="global-coin-cb" id="gc-SUI" value="SUI"><label class="global-coin-lbl" for="gc-SUI">SUI</label>
+    <span class="flt-lbl">Monedas globales:</span>
+    <button class="gcoin-btn active" onclick="toggleGCoin('BTC',this)">BTC</button>
+    <button class="gcoin-btn" onclick="toggleGCoin('ETH',this)">ETH</button>
+    <button class="gcoin-btn" onclick="toggleGCoin('SOL',this)">SOL</button>
+    <button class="gcoin-btn" onclick="toggleGCoin('ARB',this)">ARB</button>
+    <button class="gcoin-btn" onclick="toggleGCoin('OP',this)">OP</button>
+    <button class="gcoin-btn" onclick="toggleGCoin('AVAX',this)">AVAX</button>
+    <button class="gcoin-btn" onclick="toggleGCoin('DOGE',this)">DOGE</button>
+    <button class="gcoin-btn" onclick="toggleGCoin('WIF',this)">WIF</button>
+    <button class="gcoin-btn" onclick="toggleGCoin('SUI',this)">SUI</button>
     <button class="apply-all-btn" onclick="applyAllCoins()">&#x25BA; Aplicar a todos</button>
   </div>
 
@@ -578,9 +577,9 @@ function render(d){
     const fStats = _filteredStats(p, selCoins);
     const fPnlCls = pc(fStats.pnl);
     const hasMini = fStats.hist.length >= 2;
-    const coinCbsHtml = ALL_COINS_LIST.map(c=>{
-      const chk = selCoins.has(c)?'checked':'';
-      return `<input type="checkbox" class="coin-cb coin-cb-${b.idx}" id="cc-${b.idx}-${c}" value="${c}" ${chk} onchange="onCoinChange(${b.idx})"><label class="coin-lbl" for="cc-${b.idx}-${c}">${c}</label>`;
+    const coinBtnsHtml = ALL_COINS_LIST.map(c=>{
+      const act = selCoins.has(c)?' active':'';
+      return `<button class="coin-btn${act}" onclick="event.stopPropagation();toggleCoin(${b.idx},'${c}',this)">${c}</button>`;
     }).join('');
     return `<div class="card ${cv}" data-interval="${b.interval}" data-pnl-pos="${p.total_pnl>=0?1:0}" data-type="${bType}">
       <div style="cursor:pointer" onclick="openTVModal('${firstCoin}','${b.interval}','${b.label}')">
@@ -590,7 +589,7 @@ function render(d){
       </div>
       <div id="card-pnl-${b.idx}" class="card-filtpnl ${fPnlCls}">${fp(fStats.pnl)}$ &middot; ${fStats.wr.toFixed(1)}% wr &middot; ${fStats.trades} ops</div>
       ${hasMini?`<div class="card-micro"><canvas id="mini-${b.idx}"></canvas></div>`:''}
-      <div class="coin-sel" onclick="event.stopPropagation()"><span class="coin-sel-lbl">Monedas:</span>${coinCbsHtml}</div>
+      <div class="coin-sel"><span class="coin-sel-lbl">Monedas:</span>${coinBtnsHtml}</div>
       <div class="card-row" style="margin-top:4px">
         <span>${p.positions.length} pos.</span>
         <span>scan: ${b.last_scan}</span>
@@ -741,15 +740,18 @@ function _ccRender(){
   const cnt=document.getElementById('cc-cnt');
   if(cnt) cnt.textContent=rows.length+' bots';
   if(!rows.length){
-    tb.innerHTML='<tr><td colspan="11" class="empty">Sin operaciones todav\xEDa \u2014 los datos aparecer\xE1n cuando los bots empiecen a operar.</td></tr>';
+    tb.innerHTML='<tr><td colspan="11" class="empty">Sin datos \u2014 ejecuta un backtest (3M/6M/1A/M\xC1X) para ver el ranking.</td></tr>';
     return;
   }
   tb.innerHTML=rows.map((r,i)=>{
     const pCls=r.pnl>=0?'up':'dn', sign=r.pnl>=0?'+':'';
     const warn=r.pnl<0?'<span style="color:#ff4466;font-size:10px">\u26A0 Revisar</span>':'<span style="color:#00e676;font-size:10px">OK</span>';
-    const star=r.sharpe>5?'\u2B50':'' ;
-    const sCls=r.sharpe>=1?'up':r.sharpe<0?'dn':'nu';
-    const ddCls=r.dd>20?'dn':r.dd>10?'':'nu';
+    const wrTxt  = r.wr!==null     ? r.wr.toFixed(1)+'%'    : '<span style="color:#37505f">--</span>';
+    const ddTxt  = r.dd!==null     ? r.dd.toFixed(1)+'%'    : '<span style="color:#37505f">--</span>';
+    const shTxt  = r.sharpe!==null ? (r.sharpe>5?'\u2B50':'')+r.sharpe : '<span style="color:#37505f">--</span>';
+    const ddCls  = r.dd!==null&&r.dd>20?'dn':r.dd!==null&&r.dd>10?'':'nu';
+    const sCls   = r.sharpe!==null&&r.sharpe>=1?'up':r.sharpe!==null&&r.sharpe<0?'dn':'nu';
+    const srcTxt = r.hasBt?'<span style="font-size:9px;color:#37505f">BT</span>':'<span style="font-size:9px;color:#263a4a">live</span>';
     return `<tr>
       <td style="color:#37505f">${i+1}</td>
       <td class="${COLS[r.idx%18]}">${r.label}</td>
@@ -757,30 +759,37 @@ function _ccRender(){
       <td style="font-size:10px">${r.interval}</td>
       <td class="${pCls}">${sign}${r.pnl.toFixed(2)}</td>
       <td class="${pCls}">${sign}${r.pnl_pct.toFixed(1)}%</td>
-      <td>${r.wr.toFixed(1)}%</td>
-      <td class="${ddCls}">${r.dd.toFixed(1)}%</td>
-      <td class="${sCls}">${star}${r.sharpe}</td>
-      <td style="font-size:10px;color:#78909c">${r.score.toFixed(2)}</td>
+      <td>${wrTxt}</td>
+      <td class="${ddCls}">${ddTxt}</td>
+      <td class="${sCls}">${shTxt}</td>
+      <td style="font-size:10px;color:#78909c">${srcTxt} ${r.score.toFixed(2)}</td>
       <td>${warn}</td>
     </tr>`;
   }).join('');
 }
 function renderControlCenter(d){
   if(!d||!d.bots) return;
+  // Build backtest lookup by bot idx (use latest backtest if available)
+  const btMap={};
+  if(_btResults&&_btResults.bots){
+    _btResults.bots.forEach(b=>{ btMap[b.idx]=b; });
+  }
   _ccData=d.bots.map(b=>{
     const p=b.portfolio||{};
-    const equity=p.equity||0;
-    const total_pnl=p.total_pnl||0;
-    const initEq=equity-total_pnl>0?equity-total_pnl:10000;
-    const hist=p.history||[];
-    const trades=p.trades||0, wins=p.wins||0;
-    const wr=trades>0?wins/trades*100:0;
-    const dd=_ddFromHist(hist,initEq);
-    const sharpe=_sharpeFromHist(hist,initEq);
-    const pnl_pct=p.total_pnl_pct||0;
-    const score=(pnl_pct*wr)/Math.max(dd,1);
+    const bt=btMap[b.idx];       // backtest row for this bot (may be undefined)
+    const hasBt=!!bt;
+    // Prefer backtest stats; fall back to live portfolio
+    const pnl    = hasBt ? bt.total_pnl     : (p.total_pnl||0);
+    const pnl_pct= hasBt ? bt.total_pnl_pct : (p.total_pnl_pct||0);
+    const wr     = hasBt ? bt.win_rate       : ((p.trades||0)>0?(p.wins||0)/(p.trades||1)*100:null);
+    const dd     = hasBt ? bt.max_drawdown   : null;
+    const sharpe = hasBt ? bt.sharpe         : null;
+    const trades = hasBt ? bt.total_trades   : (p.trades||0);
+    // Score only meaningful when we have real metrics
+    const score  = (wr!==null&&dd!==null) ? (pnl_pct*(wr/100))/Math.max(dd,1) : pnl_pct;
+    const status = p.positions&&p.positions.length>0 ? 'En posici\xF3n' : (b.status||'OK');
     return {idx:b.idx,label:b.label||'',cat:ccCat(b.label||''),
-            interval:b.interval||'',pnl:total_pnl,pnl_pct,wr,dd,sharpe,score};
+            interval:b.interval||'',pnl,pnl_pct,wr,dd,sharpe,trades,score,hasBt,status};
   });
   _ccRender();
 }
@@ -816,9 +825,36 @@ function renderMiniChart(idx,hist){
   });
 }
 
-function onCoinChange(idx){
-  const checked=new Set([...document.querySelectorAll(`.coin-cb-${idx}:checked`)].map(cb=>cb.value));
-  _botCoins[idx]=checked.size>0?checked:new Set(['BTC']);
+// Toggle a coin button on a specific bot card
+function toggleCoin(idx, coin, btn){
+  if(!_botCoins[idx]) _botCoins[idx]=new Set(['BTC']);
+  const sel=_botCoins[idx];
+  if(sel.has(coin)){
+    if(sel.size===1) return; // at least 1 coin required
+    sel.delete(coin);
+    btn.classList.remove('active');
+  } else {
+    sel.add(coin);
+    btn.classList.add('active');
+  }
+  _updateCardStats(idx);
+}
+
+// Toggle a coin in the global selector bar
+const _gCoins=new Set(['BTC']);
+function toggleGCoin(coin, btn){
+  if(_gCoins.has(coin)){
+    if(_gCoins.size===1) return;
+    _gCoins.delete(coin);
+    btn.classList.remove('active');
+  } else {
+    _gCoins.add(coin);
+    btn.classList.add('active');
+  }
+}
+
+// Update PnL/WinRate/mini chart for one bot card without full re-render
+function _updateCardStats(idx){
   if(!_lastD) return;
   const b=_lastD.bots.find(x=>x.idx===idx);
   if(!b) return;
@@ -829,15 +865,13 @@ function onCoinChange(idx){
     pEl.className='card-filtpnl '+cls;
     pEl.textContent=(fStats.pnl>=0?'+':'')+fStats.pnl.toFixed(2)+'$ \xB7 '+fStats.wr.toFixed(1)+'% wr \xB7 '+fStats.trades+' ops';
   }
-  renderMiniChart(idx,fStats.hist);
+  if(fStats.hist.length>=2) renderMiniChart(idx,fStats.hist);
 }
 
+// Apply global coin selection to all bot cards
 function applyAllCoins(){
-  const sel=new Set([...document.querySelectorAll('.global-coin-cb:checked')].map(cb=>cb.value));
-  if(sel.size===0) return;
-  if(!_lastD) return;
-  _lastD.bots.forEach(b=>{_botCoins[b.idx]=new Set(sel);});
-  // Re-render all cards
+  if(_gCoins.size===0||!_lastD) return;
+  _lastD.bots.forEach(b=>{_botCoins[b.idx]=new Set(_gCoins);});
   render(_lastD);
 }
 
@@ -1195,6 +1229,7 @@ setInterval(fetchFNG, 600_000); // actualiza cada 10 min
 let _btPeriod = null, _btPoll = null;
 const _eqCharts = {};
 let _btBarChart = null;
+let _btResults = null; // latest backtest results (used by Control Center)
 const BT_PERIOD_LBL = {'3m':'3 Meses','6m':'6 Meses','1y':'1 Año','max':'Máximo'};
 
 function btLoad(period){
@@ -1237,6 +1272,7 @@ function btPollOnce(){
 
 function btShowResults(data){
   if(!data||!data.bots) return;
+  _btResults = data; // store for Control Center
   document.getElementById('bt-results').style.display = 'block';
   const lbl = BT_PERIOD_LBL[data.period] || data.period;
   document.getElementById('bt-period-lbl').textContent = lbl + ' · ' + data.computed_at;
@@ -1244,6 +1280,8 @@ function btShowResults(data){
   btRenderBar(data.bots);
   btRenderTable(data.bots);
   document.getElementById('bt-computed-at').textContent = 'Calculado: ' + data.computed_at + ' · Capital inicial $10,000 por bot';
+  // Refresh Control Center with backtest data
+  if(_lastD) try{ renderControlCenter(_lastD); }catch(e){}
 }
 
 function btRenderEquity(bots){
