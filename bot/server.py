@@ -172,6 +172,33 @@ tr:hover td{background:#0d1420}
 .bt-eq-meta{display:flex;gap:8px;font-size:9px;color:#546e7a;margin-top:4px;flex-wrap:wrap}
 .bt-sec-title{font-size:11px;color:#4fc3f7;padding:10px 10px 4px;letter-spacing:.5px}
 @media(max-width:580px){.bt-eq-grid{grid-template-columns:1fr}}
+
+/* ── CONTROL CENTER ── */
+.cc-flt{display:flex;gap:6px;flex-wrap:wrap;padding:10px 14px 0;align-items:center}
+.cc-cat{padding:3px 10px;border:1px solid #1e3a4a;border-radius:3px;font-size:11px;font-weight:bold;cursor:pointer;background:#0a0f1c;color:#546e7a;transition:all .2s;font-family:inherit}
+.cc-cat.active{background:#0d2030;border-color:#4fc3f7;color:#4fc3f7}
+.cc-cat:hover{border-color:#37505f;color:#c9d4e0}
+th.srt{cursor:pointer;user-select:none}
+th.srt:hover{color:#4fc3f7}
+th.srt.asc::after{content:' \25B2'}
+th.srt.desc::after{content:' \25BC'}
+
+/* ── COIN SELECTOR PER CARD ── */
+.coin-sel{display:flex;flex-wrap:wrap;gap:3px;margin:5px 0 3px;padding-top:5px;border-top:1px solid #0d1520;cursor:default}
+.coin-cb{display:none}
+.coin-lbl{padding:2px 6px;border:1px solid #1e3a4a;border-radius:3px;font-size:9px;cursor:pointer;color:#546e7a;background:#07090f;transition:all .15s;user-select:none}
+.coin-cb:checked+.coin-lbl{background:#0d2030;border-color:#4fc3f7;color:#4fc3f7}
+.coin-lbl:hover{border-color:#37505f}
+.card-micro{position:relative;height:52px;margin:4px 0 2px}
+.card-filtpnl{font-size:12px;margin-bottom:2px}
+.apply-all-wrap{display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:6px 10px;background:#08101c;border:1px solid #162030;border-radius:6px}
+.apply-all-wrap .flt-lbl{white-space:nowrap}
+.global-coin-cb{display:none}
+.global-coin-lbl{padding:3px 9px;border:1px solid #1e3a4a;border-radius:3px;font-size:10px;cursor:pointer;color:#546e7a;background:#07090f;transition:all .15s;user-select:none}
+.global-coin-cb:checked+.global-coin-lbl{background:#0d2030;border-color:#4fc3f7;color:#4fc3f7}
+.global-coin-lbl:hover{border-color:#37505f}
+.apply-all-btn{padding:4px 14px;border:1px solid #1e4a2a;border-radius:3px;font-size:11px;font-weight:bold;cursor:pointer;background:#071207;color:#69f0ae;font-family:inherit;transition:all .2s;white-space:nowrap}
+.apply-all-btn:hover{border-color:#69f0ae;background:#0a1a0a}
 </style>
 </head>
 <body>
@@ -357,6 +384,42 @@ tr:hover td{background:#0d1420}
   </div>
   <!-- ── FIN BACKTEST ─────────────────────────────────────────────────────── -->
 
+  <!-- ── CONTROL CENTER ───────────────────────────────────────────────────── -->
+  <div class="panel" id="cc-section">
+    <div class="ph">
+      <span>&#x1F3DB; Control Center &mdash; Ranking Live</span>
+      <span class="ph-cnt" id="cc-cnt"></span>
+    </div>
+    <div class="cc-flt">
+      <span class="flt-lbl">Categor&iacute;a:</span>
+      <button class="cc-cat active" onclick="ccFilter('all',this)">Todos</button>
+      <button class="cc-cat" onclick="ccFilter('Conservador',this)">Conservador</button>
+      <button class="cc-cat" onclick="ccFilter('Equilibrado',this)">Equilibrado</button>
+      <button class="cc-cat" onclick="ccFilter('Alta Frecuencia',this)">Alta Frecuencia</button>
+      <button class="cc-cat" onclick="ccFilter('Liquidaciones',this)">Liquidaciones</button>
+      <button class="cc-cat" onclick="ccFilter('Legacy',this)">Legacy</button>
+    </div>
+    <div class="tbl-wrap" style="padding:0 14px 10px">
+      <table id="cc-table">
+        <thead><tr>
+          <th>#</th>
+          <th class="srt" data-col="label" onclick="ccSort('label')">Nombre</th>
+          <th class="srt" data-col="cat" onclick="ccSort('cat')">Categor&iacute;a</th>
+          <th class="srt" data-col="interval" onclick="ccSort('interval')">TF</th>
+          <th class="srt" data-col="pnl" onclick="ccSort('pnl')">PnL $</th>
+          <th class="srt" data-col="pnl_pct" onclick="ccSort('pnl_pct')">PnL %</th>
+          <th class="srt" data-col="wr" onclick="ccSort('wr')">WinRate%</th>
+          <th class="srt" data-col="dd" onclick="ccSort('dd')">MaxDD%</th>
+          <th class="srt" data-col="sharpe" onclick="ccSort('sharpe')">Sharpe</th>
+          <th class="srt" data-col="score" onclick="ccSort('score')">Score</th>
+          <th>Estado</th>
+        </tr></thead>
+        <tbody id="cc-tbody"><tr><td colspan="11" class="empty">Cargando&hellip;</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+  <!-- ── FIN CONTROL CENTER ────────────────────────────────────────────────── -->
+
   <!-- ── FILTER BAR ────────────────────────────────────────────────────────── -->
   <div class="flt-bar">
     <span class="flt-lbl">Filtrar:</span>
@@ -368,6 +431,21 @@ tr:hover td{background:#0d1420}
     <button class="flt-btn" onclick="applyFilter('1h',this)">1h</button>
     <button class="flt-btn" onclick="applyFilter('4h',this)">4h</button>
     <button class="flt-btn" onclick="applyFilter('liq',this)">Liquidaciones</button>
+  </div>
+
+  <!-- ── GLOBAL COIN SELECTOR ─────────────────────────────────────────────── -->
+  <div class="apply-all-wrap">
+    <span class="flt-lbl">Aplicar monedas:</span>
+    <input type="checkbox" class="global-coin-cb" id="gc-BTC" value="BTC" checked><label class="global-coin-lbl" for="gc-BTC">BTC</label>
+    <input type="checkbox" class="global-coin-cb" id="gc-ETH" value="ETH"><label class="global-coin-lbl" for="gc-ETH">ETH</label>
+    <input type="checkbox" class="global-coin-cb" id="gc-SOL" value="SOL"><label class="global-coin-lbl" for="gc-SOL">SOL</label>
+    <input type="checkbox" class="global-coin-cb" id="gc-ARB" value="ARB"><label class="global-coin-lbl" for="gc-ARB">ARB</label>
+    <input type="checkbox" class="global-coin-cb" id="gc-OP" value="OP"><label class="global-coin-lbl" for="gc-OP">OP</label>
+    <input type="checkbox" class="global-coin-cb" id="gc-AVAX" value="AVAX"><label class="global-coin-lbl" for="gc-AVAX">AVAX</label>
+    <input type="checkbox" class="global-coin-cb" id="gc-DOGE" value="DOGE"><label class="global-coin-lbl" for="gc-DOGE">DOGE</label>
+    <input type="checkbox" class="global-coin-cb" id="gc-WIF" value="WIF"><label class="global-coin-lbl" for="gc-WIF">WIF</label>
+    <input type="checkbox" class="global-coin-cb" id="gc-SUI" value="SUI"><label class="global-coin-lbl" for="gc-SUI">SUI</label>
+    <button class="apply-all-btn" onclick="applyAllCoins()">&#x25BA; Aplicar a todos</button>
   </div>
 
   <div class="grid3" id="bot-cards">
@@ -431,7 +509,9 @@ function fp(v){ return (v>=0?'+':'')+v.toFixed(2); }
 function fmt(v,d=2){ return Number(v).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d}); }
 function fmtPx(v){ return v>=1000?fmt(v,2):v>=1?fmt(v,4):fmt(v,6); }
 
+let _lastD = null;
 function render(d){
+  _lastD = d;
   d.bots.sort((a,b)=>b.portfolio.total_pnl - a.portfolio.total_pnl);
   // Header
   const tc=pc(d.total_pnl);
@@ -477,32 +557,50 @@ function render(d){
   document.getElementById('exec-pos-sub').textContent = nPos+'/'+nTot+' bots';
 
   // ── Bot cards ─────────────────────────────────────────────────────────────
+  const ALL_COINS_LIST = ['BTC','ETH','SOL','ARB','OP','AVAX','DOGE','WIF','SUI'];
   document.getElementById('bot-cards').innerHTML=d.bots.map((b,i)=>{
     const p=b.portfolio, cc=COLS[b.idx%18], cv=CARDS[b.idx%18];
     const ma=b.ma_type==='liq'?`LIQ·${b.strategy||''}`.toUpperCase()
              :(b.ma_type==='ema'?'EMA':'SMA')+` ${b.ma_fast}/${b.ma_slow}`;
     const tr=(b.trailing_pct*100).toFixed(1);
-    const wr=p.trades>0?`${p.wins}/${p.trades} wins`:'0 trades';
     const pc2=pc(p.total_pnl);
     const sBadge=b.status==='escaneando'
       ?'<span class="b b-entry">SCAN</span>'
       :'<span class="b b-wait">'+b.status+'</span>';
     const bType = b.ma_type==='liq'?'liq':'ema';
     const firstCoin = (b.coins&&b.coins[0])||'BTC';
-    return `<div class="card ${cv}" data-interval="${b.interval}" data-pnl-pos="${p.total_pnl>=0?1:0}" data-type="${bType}"
-      onclick="openTVModal('${firstCoin}','${b.interval}','${b.label}')">
-      <div class="card-name ${cc}">${b.label} ${sBadge}</div>
-      <div class="card-meta">${ma} &middot; ${b.interval} &middot; trailing ${tr}% &middot; coins: ${b.coins.slice(0,5).join(', ')}&hellip;</div>
-      <div class="card-eq">$${fmt(p.equity)}</div>
-      <div class="card-pnl ${pc2}">${fp(p.total_pnl)}$ (${fp(p.total_pnl_pct)}%)</div>
-      <div class="card-row">
-        <span>${wr}</span>
+    // Coin selection state (persists across renders)
+    if(!_botCoins[b.idx]){
+      _botCoins[b.idx] = b.coins&&b.coins.includes('BTC') ? new Set(['BTC']) : new Set([(b.coins&&b.coins[0])||'BTC']);
+    }
+    const selCoins = _botCoins[b.idx];
+    const fStats = _filteredStats(p, selCoins);
+    const fPnlCls = pc(fStats.pnl);
+    const coinCbsHtml = ALL_COINS_LIST.map(c=>{
+      const chk = selCoins.has(c)?'checked':'';
+      return `<input type="checkbox" class="coin-cb coin-cb-${b.idx}" id="cc-${b.idx}-${c}" value="${c}" ${chk} onchange="onCoinChange(${b.idx})"><label class="coin-lbl" for="cc-${b.idx}-${c}">${c}</label>`;
+    }).join('');
+    return `<div class="card ${cv}" data-interval="${b.interval}" data-pnl-pos="${p.total_pnl>=0?1:0}" data-type="${bType}">
+      <div style="cursor:pointer" onclick="openTVModal('${firstCoin}','${b.interval}','${b.label}')">
+        <div class="card-name ${cc}">${b.label} ${sBadge}</div>
+        <div class="card-meta">${ma} &middot; ${b.interval} &middot; trailing ${tr}%</div>
+        <div class="card-eq">$${fmt(p.equity)}</div>
+      </div>
+      <div id="card-pnl-${b.idx}" class="card-filtpnl ${fPnlCls}">${fp(fStats.pnl)}$ &middot; ${fStats.wr.toFixed(1)}% wr &middot; ${fStats.trades} ops</div>
+      <div class="card-micro"><canvas id="mini-${b.idx}"></canvas></div>
+      <div class="coin-sel" onclick="event.stopPropagation()">${coinCbsHtml}</div>
+      <div class="card-row" style="margin-top:4px">
         <span>${p.positions.length} pos.</span>
         <span>scan: ${b.last_scan}</span>
         ${b.errors?`<span class="dn">${b.errors} err</span>`:''}
       </div>
     </div>`;
   }).join('');
+  // Render mini charts after DOM update
+  requestAnimationFrame(()=>{
+    d.bots.forEach(b=>{ renderMiniChart(b.idx, _filteredStats(b.portfolio, _botCoins[b.idx]||new Set(['BTC'])).hist); });
+  });
+  renderControlCenter(d);
 
   // Positions
   const allPos=[];
@@ -573,6 +671,160 @@ function render(d){
     }).join('');
 
   document.getElementById('last-upd').textContent='Actualizado: '+d.updated_at;
+}
+
+// ── CONTROL CENTER ────────────────────────────────────────────────────────────
+const CC_CAT_MAP = {
+  'BOT\xB72H\xB7CONS':'Conservador','BOT\xB71H\xB7CONS':'Conservador','BOT\xB74H\xB7CONS':'Conservador',
+  'BOT\xB72H\xB7EQ':'Equilibrado','BOT\xB71H\xB7EQ':'Equilibrado','BOT\xB730M\xB7EQ':'Equilibrado','BOT\xB74H\xB7EQ':'Equilibrado',
+  'BOT\xB715M\xB7HF':'Alta Frecuencia','BOT\xB715M\xB7HF2':'Alta Frecuencia','BOT\xB730M\xB7HF':'Alta Frecuencia'
+};
+function ccCat(label){
+  if(CC_CAT_MAP[label]) return CC_CAT_MAP[label];
+  if(label.startsWith('LIQ\xB7')) return 'Liquidaciones';
+  return 'Legacy';
+}
+function _ddFromHist(hist, initEq){
+  let eq=initEq, peak=initEq, maxDD=0;
+  [...hist].sort((a,b2)=>a.ts-b2.ts).forEach(t=>{
+    eq+=(t.pnl||0);
+    if(eq>peak) peak=eq;
+    const dd=peak>0?(peak-eq)/peak*100:0;
+    if(dd>maxDD) maxDD=dd;
+  });
+  return maxDD;
+}
+function _sharpeFromHist(hist, initEq){
+  const days={};
+  [...hist].sort((a,b2)=>a.ts-b2.ts).forEach(t=>{
+    const d=(t.closed_at||'').slice(0,10);
+    if(d) days[d]=(days[d]||0)+(t.pnl||0);
+  });
+  const rets=Object.values(days).map(v=>v/initEq*100);
+  if(rets.length<2) return 0;
+  const mean=rets.reduce((s,v)=>s+v,0)/rets.length;
+  const std=Math.sqrt(rets.reduce((s,v)=>s+(v-mean)**2,0)/rets.length)||0;
+  return std===0?0:+(mean/std*Math.sqrt(365)).toFixed(2);
+}
+let _ccSortState={col:'score',dir:-1};
+let _ccCatFilter='all';
+let _ccData=[];
+function ccSort(col){
+  if(_ccSortState.col===col) _ccSortState.dir*=-1; else {_ccSortState.col=col;_ccSortState.dir=-1;}
+  document.querySelectorAll('#cc-table th.srt').forEach(th=>{
+    th.classList.remove('asc','desc');
+    if(th.dataset.col===col) th.classList.add(_ccSortState.dir>0?'asc':'desc');
+  });
+  _ccRender();
+}
+function ccFilter(cat,btn){
+  _ccCatFilter=cat;
+  document.querySelectorAll('.cc-cat').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  _ccRender();
+}
+function _ccRender(){
+  const tb=document.getElementById('cc-tbody');
+  if(!tb) return;
+  let rows=_ccCatFilter==='all'?[..._ccData]:_ccData.filter(r=>r.cat===_ccCatFilter);
+  const {col,dir}=_ccSortState;
+  rows.sort((a,b2)=>{
+    const va=typeof a[col]==='string'?a[col]:+a[col];
+    const vb=typeof b2[col]==='string'?b2[col]:+b2[col];
+    return va<vb?dir:va>vb?-dir:0;
+  });
+  document.getElementById('cc-cnt').textContent=rows.length+' bots';
+  tb.innerHTML=rows.map((r,i)=>{
+    const pCls=r.pnl>=0?'up':'dn', sign=r.pnl>=0?'+':'';
+    const warn=r.pnl<0?'<span style="color:#ff4466;font-size:10px">\u26A0 Revisar</span>':'<span style="color:#00e676;font-size:10px">OK</span>';
+    const star=r.sharpe>5?'\u2B50':'' ;
+    const sCls=r.sharpe>=1?'up':r.sharpe<0?'dn':'nu';
+    const ddCls=r.dd>20?'dn':r.dd>10?'':'nu';
+    return `<tr>
+      <td style="color:#37505f">${i+1}</td>
+      <td class="${COLS[r.idx%18]}">${r.label}</td>
+      <td style="font-size:10px;color:#78909c">${r.cat}</td>
+      <td style="font-size:10px">${r.interval}</td>
+      <td class="${pCls}">${sign}${r.pnl.toFixed(2)}</td>
+      <td class="${pCls}">${sign}${r.pnl_pct.toFixed(1)}%</td>
+      <td>${r.wr.toFixed(1)}%</td>
+      <td class="${ddCls}">${r.dd.toFixed(1)}%</td>
+      <td class="${sCls}">${star}${r.sharpe}</td>
+      <td style="font-size:10px;color:#78909c">${r.score.toFixed(2)}</td>
+      <td>${warn}</td>
+    </tr>`;
+  }).join('');
+}
+function renderControlCenter(d){
+  _ccData=d.bots.map(b=>{
+    const p=b.portfolio;
+    const initEq=p.equity-(p.total_pnl||0);
+    const hist=p.history||[];
+    const wr=p.trades>0?p.wins/p.trades*100:0;
+    const dd=_ddFromHist(hist,initEq>0?initEq:10000);
+    const sharpe=_sharpeFromHist(hist,initEq>0?initEq:10000);
+    const pnl_pct=p.total_pnl_pct||0;
+    const score=(pnl_pct*wr)/Math.max(dd,1);
+    return {idx:b.idx,label:b.label,cat:ccCat(b.label),interval:b.interval,
+            pnl:p.total_pnl,pnl_pct,wr,dd,sharpe,score};
+  });
+  _ccRender();
+}
+
+// ── COIN SELECTOR / MICRO CHARTS ─────────────────────────────────────────────
+const _botCoins={};
+const _miniCharts={};
+
+function _filteredStats(portfolio, coinSet){
+  const hist=(portfolio.history||[]).filter(t=>coinSet.has(t.coin));
+  const pnl=hist.reduce((s,t)=>s+(t.pnl||0),0);
+  const wins=hist.filter(t=>(t.pnl||0)>0).length;
+  const wr=hist.length>0?wins/hist.length*100:0;
+  return {pnl,wr,trades:hist.length,wins,hist};
+}
+
+function renderMiniChart(idx,hist){
+  const cv=document.getElementById('mini-'+idx);
+  if(!cv) return;
+  if(_miniCharts[idx]){_miniCharts[idx].destroy();delete _miniCharts[idx];}
+  if(!hist||hist.length<2) return;
+  const sorted=[...hist].sort((a,b2)=>a.ts-b2.ts);
+  let eq=10000;
+  const pts=sorted.map(t=>{eq+=(t.pnl||0);return eq;});
+  const color=pts[pts.length-1]>=pts[0]?'#00e676':'#ff4466';
+  _miniCharts[idx]=new Chart(cv,{
+    type:'line',
+    data:{labels:pts.map((_,i)=>i),datasets:[{data:pts,borderColor:color,borderWidth:1.2,
+      fill:false,pointRadius:0,tension:0.2}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:{duration:0},
+      plugins:{legend:{display:false},tooltip:{enabled:false}},
+      scales:{x:{display:false},y:{display:false}}}
+  });
+}
+
+function onCoinChange(idx){
+  const checked=new Set([...document.querySelectorAll(`.coin-cb-${idx}:checked`)].map(cb=>cb.value));
+  _botCoins[idx]=checked.size>0?checked:new Set(['BTC']);
+  if(!_lastD) return;
+  const b=_lastD.bots.find(x=>x.idx===idx);
+  if(!b) return;
+  const fStats=_filteredStats(b.portfolio,_botCoins[idx]);
+  const pEl=document.getElementById('card-pnl-'+idx);
+  if(pEl){
+    const cls=fStats.pnl>=0?'up':'dn';
+    pEl.className='card-filtpnl '+cls;
+    pEl.textContent=(fStats.pnl>=0?'+':'')+fStats.pnl.toFixed(2)+'$ \xB7 '+fStats.wr.toFixed(1)+'% wr \xB7 '+fStats.trades+' ops';
+  }
+  renderMiniChart(idx,fStats.hist);
+}
+
+function applyAllCoins(){
+  const sel=new Set([...document.querySelectorAll('.global-coin-cb:checked')].map(cb=>cb.value));
+  if(sel.size===0) return;
+  if(!_lastD) return;
+  _lastD.bots.forEach(b=>{_botCoins[b.idx]=new Set(sel);});
+  // Re-render all cards
+  render(_lastD);
 }
 
 function startCD(){
