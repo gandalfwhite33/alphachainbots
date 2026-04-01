@@ -112,6 +112,7 @@ tr:hover td{background:#0d1420}
 .hmap-tab.active{background:#0d2030;border-color:#4fc3f7;color:#4fc3f7}
 .hmap-pane{display:none}.hmap-pane.active{display:block}
 .hmap-canvas-wrap{position:relative;height:280px}
+.hmap-nodata{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#263a4a;font-size:12px;pointer-events:none;background:#07090f}
 .hmap-danger{font-size:10px;color:#ff6b6b;margin-top:4px;min-height:16px}
 /* OI/Funding compact table */
 .oi-pos{color:#00e676}.oi-neg{color:#ff4466}.oi-nu{color:#78909c}
@@ -935,12 +936,22 @@ if(typeof Chart !== 'undefined'){
   Chart.register(priceLinePlugin);
 }
 
+function _hmapNodata(coin, msg){
+  const wrap = document.getElementById('hchart-'+coin)?.parentElement;
+  if(!wrap) return;
+  let nd = wrap.querySelector('.hmap-nodata');
+  if(!nd){ nd = document.createElement('div'); nd.className='hmap-nodata'; wrap.appendChild(nd); }
+  nd.textContent = msg || '';
+  nd.style.display = msg ? 'flex' : 'none';
+}
+
 function renderHeatmapChart(coin, data){
   const canvas = document.getElementById('hchart-'+coin);
   if(!canvas) return;
   const zones = data.zones || [];
   const price = data.price || 0;
-  if(!zones.length) return;
+  if(!zones.length){ _hmapNodata(coin, 'Sin datos de liquidaciones'); return; }
+  _hmapNodata(coin, '');
 
   // Sort ascending by price (Chart.js indexAxis:y renders bottom→top by default, we reverse)
   const sorted = [...zones].sort((a,b)=>a.price-b.price);
@@ -1201,6 +1212,7 @@ function fetchFNG(){
     });
 }
 
+for(const _c of ['BTC','ETH','SOL','AVAX','DOGE','ARB','OP','WIF','SUI']) _hmapNodata(_c,'Cargando datos\u2026');
 fetchData();
 fetchMarket();
 fetchFNG();
