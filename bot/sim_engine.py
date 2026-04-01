@@ -42,8 +42,9 @@ _HL_URL = "https://api.hyperliquid.xyz/info"
 
 MARKET_UPDATE_SEC = 300          # actualiza market data cada 5 min
 MAX_OI_HISTORY    = 48           # ~4h de historial a 5-min intervals
-LIQ_COINS         = ["BTC", "ETH", "SOL"]
-OI_COINS          = ["BTC", "ETH", "SOL", "XRP", "DOGE", "AVAX", "BNB", "LINK", "HYPE", "TAO"]
+LIQ_COINS         = ["BTC", "ETH", "SOL", "AVAX", "DOGE", "ARB", "OP", "WIF", "SUI"]
+OI_COINS          = ["BTC", "ETH", "SOL", "AVAX", "DOGE", "ARB", "OP", "WIF", "SUI",
+                     "XRP", "BNB", "LINK", "HYPE", "TAO"]
 
 _mkt_lock:  threading.Lock = threading.Lock()
 _mkt_cache: dict            = {"coins": {}, "liq": {}, "oi_hist": {}, "ts": 0}

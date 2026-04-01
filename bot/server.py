@@ -233,6 +233,12 @@ tr:hover td{background:#0d1420}
           <button class="hmap-tab active" onclick="switchTab('BTC')">BTC</button>
           <button class="hmap-tab" onclick="switchTab('ETH')">ETH</button>
           <button class="hmap-tab" onclick="switchTab('SOL')">SOL</button>
+          <button class="hmap-tab" onclick="switchTab('AVAX')">AVAX</button>
+          <button class="hmap-tab" onclick="switchTab('DOGE')">DOGE</button>
+          <button class="hmap-tab" onclick="switchTab('ARB')">ARB</button>
+          <button class="hmap-tab" onclick="switchTab('OP')">OP</button>
+          <button class="hmap-tab" onclick="switchTab('WIF')">WIF</button>
+          <button class="hmap-tab" onclick="switchTab('SUI')">SUI</button>
         </div>
         <div id="hpane-BTC" class="hmap-pane active">
           <div class="hmap-canvas-wrap"><canvas id="hchart-BTC"></canvas></div>
@@ -245,6 +251,30 @@ tr:hover td{background:#0d1420}
         <div id="hpane-SOL" class="hmap-pane">
           <div class="hmap-canvas-wrap"><canvas id="hchart-SOL"></canvas></div>
           <div class="hmap-danger" id="hdanger-SOL"></div>
+        </div>
+        <div id="hpane-AVAX" class="hmap-pane">
+          <div class="hmap-canvas-wrap"><canvas id="hchart-AVAX"></canvas></div>
+          <div class="hmap-danger" id="hdanger-AVAX"></div>
+        </div>
+        <div id="hpane-DOGE" class="hmap-pane">
+          <div class="hmap-canvas-wrap"><canvas id="hchart-DOGE"></canvas></div>
+          <div class="hmap-danger" id="hdanger-DOGE"></div>
+        </div>
+        <div id="hpane-ARB" class="hmap-pane">
+          <div class="hmap-canvas-wrap"><canvas id="hchart-ARB"></canvas></div>
+          <div class="hmap-danger" id="hdanger-ARB"></div>
+        </div>
+        <div id="hpane-OP" class="hmap-pane">
+          <div class="hmap-canvas-wrap"><canvas id="hchart-OP"></canvas></div>
+          <div class="hmap-danger" id="hdanger-OP"></div>
+        </div>
+        <div id="hpane-WIF" class="hmap-pane">
+          <div class="hmap-canvas-wrap"><canvas id="hchart-WIF"></canvas></div>
+          <div class="hmap-danger" id="hdanger-WIF"></div>
+        </div>
+        <div id="hpane-SUI" class="hmap-pane">
+          <div class="hmap-canvas-wrap"><canvas id="hchart-SUI"></canvas></div>
+          <div class="hmap-danger" id="hdanger-SUI"></div>
         </div>
       </div>
     </div>
@@ -731,7 +761,7 @@ function renderOI(rows){
 function renderMarket(d){
   if(d.oi_table) renderOI(d.oi_table);
   if(d.liq){
-    for(const coin of ['BTC','ETH','SOL']){
+    for(const coin of ['BTC','ETH','SOL','AVAX','DOGE','ARB','OP','WIF','SUI']){
       if(d.liq[coin]) renderHeatmapChart(coin, d.liq[coin]);
     }
   }
