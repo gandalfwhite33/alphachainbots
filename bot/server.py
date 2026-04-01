@@ -591,7 +591,7 @@ function render(d){
         ${b.errors?`<span class="dn">${b.errors} err</span>`:''}
       </div>
       ${hasMini?`<div class="card-micro"><canvas id="mini-${b.idx}"></canvas></div>`:''}
-      <div class="card-tag">\uD83D\uDCCA ${coinTag} | ${periodTag}</div>
+      <div class="card-tag">&#x1F4CA; ${coinTag} | ${periodTag}</div>
     </div>`;
   }).join('');
   // Render mini charts after DOM update
@@ -816,7 +816,7 @@ function applyControl(){
   // Update tag in ctrl-bar
   const coinTag = [..._ctrlCoins].join(' \xB7 ');
   const tEl = document.getElementById('ctrl-tag');
-  if(tEl) tEl.textContent = '\uD83D\uDCCA '+coinTag+' | '+(_ctrlPeriod||'3m').toUpperCase();
+  if(tEl) tEl.textContent = '\U0001F4CA '+coinTag+' | '+(_ctrlPeriod||'3m').toUpperCase();
   // Update bt-section header label
   const hEl = document.getElementById('bt-period-hdr');
   if(hEl) hEl.textContent = (_ctrlPeriod||'3m').toUpperCase()+' \xB7 '+coinTag;
@@ -1410,7 +1410,7 @@ class DashHandler(BaseHTTPRequestHandler):
             self._respond(200, "application/json", b'{"ok":true}')
 
         elif path in ("/", "/index.html"):
-            self._respond(200, "text/html; charset=utf-8", DASHBOARD_HTML.encode("utf-8"))
+            self._respond(200, "text/html; charset=utf-8", DASHBOARD_HTML.encode("utf-8", errors="replace"))
 
         else:
             self._respond(404, "text/plain", b"Not Found")
