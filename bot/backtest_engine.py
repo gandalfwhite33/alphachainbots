@@ -197,14 +197,12 @@ def _bt_crossover(cfg, candles_cache: dict, days: int) -> dict:
 
     from sim_engine import FALLBACK_COINS
 
-    # cfg.coins → full $10K per coin (matches optimizer behavior)
-    # no cfg.coins → split across top 6 (legacy multi-coin bots)
-    if getattr(cfg, "coins", None):
-        bt_coins    = cfg.coins
-        coin_equity = INITIAL_EQUITY
-    else:
-        bt_coins    = FALLBACK_COINS[:6]
-        coin_equity = INITIAL_EQUITY / len(bt_coins)
+    # Each coin gets the full INITIAL_EQUITY — same model as the optimizer.
+    # Optimizer assigns coin_equity = INITIAL_EQUITY per coin and accumulates
+    # PnL across all coins, reporting total as % of INITIAL_EQUITY.
+    # This means 10 coins each earning +15% = +150% reported total — correct behavior.
+    bt_coins    = getattr(cfg, "coins", None) or FALLBACK_COINS[:6]
+    coin_equity = INITIAL_EQUITY  # full $10K per coin, NOT divided
 
     all_events: list = []
     all_trades: list = []
