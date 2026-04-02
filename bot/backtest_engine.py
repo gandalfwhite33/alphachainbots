@@ -182,21 +182,31 @@ def _downsample(snaps: list, target: int) -> list:
 def _bt_crossover(cfg, candles_cache: dict, days: int) -> dict:
     """
     Backtest for EMA/SMA crossover bots.
-    cfg: BotConfig — uses label, ma_type, ma_fast, ma_slow, trailing_pct, leverage, risk_per_trade
+    cfg: BotConfig — uses label, ma_type, ma_fast, ma_slow, trailing_pct, leverage,
+                     risk_per_trade, sl_type, fixed_sl_pct, time_filter, rsi_filter, coins
     """
     bt_interval = BT_INTERVAL_MAP.get(cfg.interval, "1h")
     leverage    = getattr(cfg, "leverage", BT_LEVERAGE)
     risk_pct    = getattr(cfg, "risk_per_trade", RISK_PCT)
     trailing    = cfg.trailing_pct
+    sl_type     = getattr(cfg, "sl_type", "trailing")
+    fixed_sl    = getattr(cfg, "fixed_sl_pct", 0.02)
+    time_filter = getattr(cfg, "time_filter", "none")
+    rsi_filter  = getattr(cfg, "rsi_filter", "none")
 
-    # Use top coins to spread capital evenly
     from sim_engine import FALLBACK_COINS
-    bt_coins = FALLBACK_COINS[:6]
 
-    all_events  = []   # (ts, pnl_usd)
-    all_trades  = []
+    # cfg.coins → full $10K per coin (matches optimizer behavior)
+    # no cfg.coins → split across top 6 (legacy multi-coin bots)
+    if getattr(cfg, "coins", None):
+        bt_coins    = cfg.coins
+        coin_equity = INITIAL_EQUITY
+    else:
+        bt_coins    = FALLBACK_COINS[:6]
+        coin_equity = INITIAL_EQUITY / len(bt_coins)
 
-    coin_equity = INITIAL_EQUITY / len(bt_coins)
+    all_events: list = []
+    all_trades: list = []
 
     for coin in bt_coins:
         key = f"{coin}_{bt_interval}"
@@ -214,16 +224,19 @@ def _bt_crossover(cfg, candles_cache: dict, days: int) -> dict:
             fast_s = _sma(closes, cfg.ma_fast)
             slow_s = _sma(closes, cfg.ma_slow)
 
+        rsi_s = _rsi(closes, 14) if rsi_filter != "none" else []
+
         off_f = len(closes) - len(fast_s)
         off_s = len(closes) - len(slow_s)
+        off_r = len(closes) - len(rsi_s) if rsi_s else 0
         start = max(off_f, off_s) + 1
 
-        in_pos  = False
-        dir_    = ""
-        entry   = 0.0
-        best    = 0.0
-        stop    = 0.0
-        eq_coin = coin_equity
+        in_pos = False
+        dir_   = ""
+        entry  = 0.0
+        best   = 0.0
+        stop   = 0.0
+        eq_c   = coin_equity
 
         for i in range(start, len(df)):
             fi = i - off_f
@@ -237,33 +250,76 @@ def _bt_crossover(cfg, candles_cache: dict, days: int) -> dict:
             sc    = slow_s[si];  sp = slow_s[si - 1]
 
             if in_pos:
-                if dir_ == "long":
-                    if price > best:
-                        best = price; stop = best * (1 - trailing)
-                    if price <= stop:
-                        pnl = eq_coin * risk_pct * (price - entry) / entry * leverage
-                        eq_coin += pnl
-                        all_events.append((ts, pnl))
-                        all_trades.append({"pnl": round(pnl, 2)})
-                        in_pos = False
-                else:
-                    if price < best:
-                        best = price; stop = best * (1 + trailing)
-                    if price >= stop:
-                        pnl = eq_coin * risk_pct * (entry - price) / entry * leverage
-                        eq_coin += pnl
-                        all_events.append((ts, pnl))
-                        all_trades.append({"pnl": round(pnl, 2)})
-                        in_pos = False
+                exited = False
+                pnl    = 0.0
+
+                if sl_type == "fixed":
+                    sl_px = entry * (1 - fixed_sl) if dir_ == "long" else entry * (1 + fixed_sl)
+                    if dir_ == "long" and price <= sl_px:
+                        pnl = eq_c * risk_pct * (price - entry) / entry * leverage
+                        exited = True
+                    elif dir_ == "short" and price >= sl_px:
+                        pnl = eq_c * risk_pct * (entry - price) / entry * leverage
+                        exited = True
+                else:  # trailing or atr — both use trailing stop logic here
+                    if dir_ == "long":
+                        if price > best:
+                            best = price; stop = best * (1 - trailing)
+                        if price <= stop:
+                            pnl = eq_c * risk_pct * (price - entry) / entry * leverage
+                            exited = True
+                    else:
+                        if price < best:
+                            best = price; stop = best * (1 + trailing)
+                        if price >= stop:
+                            pnl = eq_c * risk_pct * (entry - price) / entry * leverage
+                            exited = True
+
+                # MA reverse crossover exit (applies regardless of sl_type)
+                if not exited and fi >= 1 and si >= 1:
+                    if dir_ == "long" and fp >= sp and fc < sc:
+                        pnl = eq_c * risk_pct * (price - entry) / entry * leverage
+                        exited = True
+                    elif dir_ == "short" and fp <= sp and fc > sc:
+                        pnl = eq_c * risk_pct * (entry - price) / entry * leverage
+                        exited = True
+
+                if exited:
+                    eq_c += pnl
+                    all_events.append((ts, pnl))
+                    all_trades.append({"pnl": round(pnl, 2)})
+                    in_pos = False
 
             if not in_pos:
                 up   = fp <= sp and fc > sc
                 down = fp >= sp and fc < sc
-                if up or down:
-                    in_pos = True
-                    dir_   = "long" if up else "short"
-                    entry  = price; best = price
-                    stop   = entry * (1 - trailing) if dir_ == "long" else entry * (1 + trailing)
+                if not (up or down):
+                    continue
+
+                # Time filter — skip new entries outside session hours
+                if time_filter == "asia":
+                    if (ts // 3_600_000) % 24 >= 9:
+                        continue
+                elif time_filter == "london_ny":
+                    if (ts // 3_600_000) % 24 not in range(7, 22):
+                        continue
+
+                # RSI filter
+                if rsi_filter != "none" and rsi_s:
+                    ri = i - off_r
+                    if 0 <= ri < len(rsi_s):
+                        rv = rsi_s[ri]
+                        if rsi_filter == "rsi50":
+                            if up and rv <= 50: continue
+                            if down and rv >= 50: continue
+                        elif rsi_filter == "rsi55":
+                            if up and rv <= 55: continue
+                            if down and rv >= 45: continue
+
+                in_pos = True
+                dir_   = "long" if up else "short"
+                entry  = price; best = price
+                stop   = entry * (1 - trailing) if dir_ == "long" else entry * (1 + trailing)
 
     return _build_result(all_events, all_trades, days)
 
@@ -458,7 +514,8 @@ def _run(period: str):
         needed = set()
         for cfg in CONFIGS:
             iv = BT_INTERVAL_MAP.get(cfg.interval, "1h")
-            for coin in FALLBACK_COINS[:6]:
+            bt_coins_cfg = cfg.coins if getattr(cfg, "coins", None) else FALLBACK_COINS[:6]
+            for coin in bt_coins_cfg:
                 needed.add((coin, iv))
         for coin in ["BTC", "ETH", "SOL", "XRP"]:
             needed.add((coin, "1h"))
