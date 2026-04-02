@@ -189,9 +189,8 @@ def _bt_crossover(cfg, candles_cache: dict, days: int) -> dict:
     risk_pct    = getattr(cfg, "risk_per_trade", RISK_PCT)
     trailing    = cfg.trailing_pct
 
-    # Use top coins to spread capital evenly
     from sim_engine import FALLBACK_COINS
-    bt_coins = FALLBACK_COINS[:6]
+    bt_coins = cfg.coins if getattr(cfg, "coins", None) else FALLBACK_COINS[:6]
 
     all_events  = []   # (ts, pnl_usd)
     all_trades  = []
@@ -454,11 +453,12 @@ def _run(period: str):
 
         from sim_engine import CONFIGS, LIQ_CONFIGS, FALLBACK_COINS
 
-        # Collect required candle keys
+        # Collect required candle keys — respect each bot's own coin list
         needed = set()
         for cfg in CONFIGS:
             iv = BT_INTERVAL_MAP.get(cfg.interval, "1h")
-            for coin in FALLBACK_COINS[:6]:
+            coins = cfg.coins if getattr(cfg, "coins", None) else FALLBACK_COINS[:6]
+            for coin in coins:
                 needed.add((coin, iv))
         for coin in ["BTC", "ETH", "SOL", "XRP"]:
             needed.add((coin, "1h"))
