@@ -209,6 +209,7 @@ def _bt_crossover(cfg, candles_cache: dict, days: int,
 
     all_events: list = []
     all_trades: list = []
+    coin_pnls:  dict = {}  # {coin: total_pnl_usd} for debug breakdown
 
     for coin in bt_coins:
         key = f"{coin}_{bt_interval}"
@@ -233,12 +234,13 @@ def _bt_crossover(cfg, candles_cache: dict, days: int,
         off_r = len(closes) - len(rsi_s) if rsi_s else 0
         start = max(off_f, off_s) + 1
 
-        in_pos = False
-        dir_   = ""
-        entry  = 0.0
-        best   = 0.0
-        stop   = 0.0
-        eq_c   = coin_equity
+        in_pos    = False
+        dir_      = ""
+        entry     = 0.0
+        best      = 0.0
+        stop      = 0.0
+        eq_c      = coin_equity
+        coin_pnl  = 0.0  # accumulate this coin's PnL for the breakdown log
 
         for i in range(start, len(df)):
             fi = i - off_f
@@ -287,7 +289,8 @@ def _bt_crossover(cfg, candles_cache: dict, days: int,
                         exited = True
 
                 if exited:
-                    eq_c += pnl
+                    eq_c     += pnl
+                    coin_pnl += pnl
                     all_events.append((ts, pnl))
                     all_trades.append({"pnl": round(pnl, 2)})
                     in_pos = False
@@ -323,7 +326,9 @@ def _bt_crossover(cfg, candles_cache: dict, days: int,
                 entry  = price; best = price
                 stop   = entry * (1 - trailing) if dir_ == "long" else entry * (1 + trailing)
 
-    return _build_result(all_events, all_trades, days)
+        coin_pnls[coin] = round(coin_pnl, 2)
+
+    return _build_result(all_events, all_trades, days, coin_pnls=coin_pnls)
 
 
 # ── LIQUIDATION BOT BACKTEST (simplified proxies) ─────────────────────────────
@@ -457,20 +462,44 @@ def _liq_signal(strategy: str, closes: list, volumes: list,
     return None
 
 
-def _build_result(events: list, trades: list, days: int) -> dict:
+def _build_result(events: list, trades: list, days: int,
+                  coin_pnls: dict = None) -> dict:
+    """
+    Build backtest result from accumulated events.
+    PnL formula: total_pnl_usd = sum(all coin PnLs), pnl_pct = total_pnl_usd / INITIAL_EQUITY * 100
+    Each coin uses full INITIAL_EQUITY as base — results are additive, NOT averaged.
+    coin_pnls: optional {coin: pnl_usd} breakdown for logging.
+    """
     if not events:
         ts = int(time.time() * 1000)
         snaps = [[ts - days * 86_400_000, INITIAL_EQUITY], [ts, INITIAL_EQUITY]]
         return _compute_metrics(snaps, [], INITIAL_EQUITY, days)
 
     events.sort(key=lambda x: x[0])
-    eq  = INITIAL_EQUITY
+
+    # Explicit formula: total_pnl_usd = sum of all trades across all coins
+    total_pnl_usd = sum(pnl for _, pnl in events)
+
+    # Build equity curve starting from INITIAL_EQUITY
+    eq    = INITIAL_EQUITY
     snaps = []
     for ts, pnl in events:
         eq += pnl
         snaps.append([ts, round(eq, 2)])
 
-    return _compute_metrics(snaps, trades, INITIAL_EQUITY, days)
+    if coin_pnls:
+        breakdown = ", ".join(f"{c}=${v:+.0f}" for c, v in coin_pnls.items())
+        log.debug(f"[BT] PnL breakdown: {breakdown} → total=${total_pnl_usd:+.0f} "
+                  f"({total_pnl_usd / INITIAL_EQUITY * 100:+.1f}%)")
+
+    metrics = _compute_metrics(snaps, trades, INITIAL_EQUITY, days)
+
+    # Override with explicit formula to guarantee no hidden division
+    metrics["total_pnl"]     = round(total_pnl_usd, 2)
+    metrics["total_pnl_pct"] = round(total_pnl_usd / INITIAL_EQUITY * 100, 2)
+    metrics["final_equity"]  = round(INITIAL_EQUITY + total_pnl_usd, 2)
+
+    return metrics
 
 
 # ── CACHE & THREAD MANAGEMENT ─────────────────────────────────────────────────
