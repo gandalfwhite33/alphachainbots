@@ -201,7 +201,7 @@ def _bt_crossover(cfg, candles_cache: dict, days: int) -> dict:
     # Optimizer assigns coin_equity = INITIAL_EQUITY per coin and accumulates
     # PnL across all coins, reporting total as % of INITIAL_EQUITY.
     # This means 10 coins each earning +15% = +150% reported total — correct behavior.
-    bt_coins    = getattr(cfg, "coins", None) or FALLBACK_COINS[:6]
+    bt_coins    = getattr(cfg, "coins", None) or FALLBACK_COINS[:10]
     coin_equity = INITIAL_EQUITY  # full $10K per coin, NOT divided
 
     all_events: list = []
@@ -513,7 +513,7 @@ def _run(period: str):
         needed = set()
         for cfg in CONFIGS:
             iv = BT_INTERVAL_MAP.get(cfg.interval, "1h")
-            bt_coins_cfg = cfg.coins if getattr(cfg, "coins", None) else FALLBACK_COINS[:6]
+            bt_coins_cfg = cfg.coins if getattr(cfg, "coins", None) else FALLBACK_COINS[:10]
             for coin in bt_coins_cfg:
                 needed.add((coin, iv))
         for coin in ["BTC", "ETH", "SOL", "XRP"]:
