@@ -466,6 +466,25 @@ CONFIGS = [
         sl_type="trailing",        time_filter="asia",
         rsi_filter="rsi50",        coins=["ETH"],
     ),
+    # ── Optimizer v4 BTC ───────────────────────────────────────────────────────
+    BotConfig(idx=54,
+        name="bot_15m_v4_btc",    label="BOT\xb715M\xb7V4\xb7BTC",
+        interval="15m",            ma_type="sma",  ma_fast=50,  ma_slow=100,
+        trailing_pct=0.02,         min_vol_ratio=1.0, sr_near_pct=0.008,
+        fibo_zone_pct=0.011,       candle_limit=250,  leverage=15.0,
+        require_fib=True,          require_sr=False,
+        sl_type="fixed",           time_filter="none",
+        coins=["BTC"],
+    ),
+    BotConfig(idx=55,
+        name="bot_1h_v4_btc",     label="BOT\xb71H\xb7V4\xb7BTC",
+        interval="1h",             ma_type="sma",  ma_fast=50,  ma_slow=100,
+        trailing_pct=0.02,         min_vol_ratio=1.0, sr_near_pct=0.008,
+        fibo_zone_pct=0.011,       candle_limit=250,  leverage=15.0,
+        require_fib=False,         require_sr=False,
+        sl_type="fixed",           time_filter="london_ny",
+        coins=["BTC"],
+    ),
 ]
 
 
