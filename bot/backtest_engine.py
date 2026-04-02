@@ -24,13 +24,14 @@ PERIODS = {"3m": 90, "6m": 180, "1y": 365, "max": 900}
 
 INTERVAL_MS = {
     "15m": 900_000, "30m": 1_800_000,
-    "1h": 3_600_000, "4h": 14_400_000,
+    "1h": 3_600_000, "2h": 7_200_000, "4h": 14_400_000,
 }
 
-# 15m/30m → too many candles for long periods, map to coarser for backtest
+# 15m/30m → map to 1h (too many candles for long periods)
+# 1h/2h/4h → use native interval so MA periods match the optimizer exactly
 BT_INTERVAL_MAP = {
     "15m": "1h", "30m": "1h",
-    "1h":  "1h", "4h":  "4h",
+    "1h":  "1h", "2h":  "2h", "4h":  "4h",
 }
 
 # ── CANDLE FETCH ───────────────────────────────────────────────────────────────
