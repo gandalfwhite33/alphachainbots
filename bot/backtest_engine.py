@@ -196,7 +196,7 @@ def _bt_crossover(cfg, candles_cache: dict, days: int) -> dict:
     all_events  = []   # (ts, pnl_usd)
     all_trades  = []
 
-    coin_equity = INITIAL_EQUITY / len(bt_coins)
+    coin_equity = INITIAL_EQUITY
 
     for coin in bt_coins:
         key = f"{coin}_{bt_interval}"
@@ -285,7 +285,7 @@ def _bt_liq(cfg, candles_cache: dict, days: int) -> dict:
 
     all_events = []
     all_trades = []
-    coin_equity = INITIAL_EQUITY / len(bt_coins)
+    coin_equity = INITIAL_EQUITY
 
     for coin in bt_coins:
         key = f"{coin}_1h"
