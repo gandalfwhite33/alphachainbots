@@ -8,6 +8,9 @@ import math
 import time
 import threading
 import logging
+import os
+import json
+import datetime
 import requests
 from typing import Optional
 
@@ -33,13 +36,47 @@ BT_INTERVAL_MAP = {
     "1h":  "1h", "4h":  "4h",
 }
 
-# ── CANDLE FETCH ───────────────────────────────────────────────────────────────
+# ── DISK CANDLE CACHE ──────────────────────────────────────────────────────────
+# Candles are downloaded ONCE with a fixed end date and stored on disk.
+# On restarts or redeploys within the same month the data never changes.
 
-def _fetch_candles(coin: str, interval: str, days: int) -> list:
-    """Fetch historical OHLCV candles from Hyperliquid. Returns list of dicts."""
+CANDLE_DAYS      = 365   # always fetch 1 full year
+CANDLE_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "candle_cache")
+
+
+def _fixed_end_ms() -> int:
+    """Fixed candle window end: UTC start of current month.
+    Data is identical all month regardless of when it was downloaded."""
+    now = datetime.datetime.utcnow()
+    end = datetime.datetime(now.year, now.month, 1)
+    return int(end.timestamp() * 1000)
+
+
+def _disk_path(coin: str, interval: str) -> str:
+    os.makedirs(CANDLE_CACHE_DIR, exist_ok=True)
+    return os.path.join(CANDLE_CACHE_DIR, f"{coin}_{interval}.json")
+
+
+def _fetch_candles(coin: str, interval: str, days: int = CANDLE_DAYS) -> list:
+    """Return OHLCV candles. Loads from disk cache if available; otherwise
+    downloads 365 days with a fixed end date and saves to disk permanently."""
+    path = _disk_path(coin, interval)
+
+    # ── try disk cache first ──────────────────────────────────────────────────
+    if os.path.exists(path):
+        try:
+            with open(path, "r") as fh:
+                candles = json.load(fh)
+            if candles:
+                log.info(f"[BT] Disk cache hit {coin}/{interval}: {len(candles)} candles")
+                return candles
+        except Exception as exc:
+            log.warning(f"[BT] Disk cache read error {path}: {exc}")
+
+    # ── download (first run only) ─────────────────────────────────────────────
     try:
-        end_ms   = int(time.time() * 1000)
-        start_ms = end_ms - int(days * 86_400_000)
+        end_ms   = _fixed_end_ms()
+        start_ms = end_ms - int(CANDLE_DAYS * 86_400_000)
         r = requests.post(HL_URL, json={
             "type": "candleSnapshot",
             "req": {"coin": coin, "interval": interval,
@@ -61,9 +98,17 @@ def _fetch_candles(coin: str, interval: str, days: int) -> list:
                 })
             except (TypeError, ValueError):
                 pass
-        return sorted(out, key=lambda x: x["t"])
-    except Exception as e:
-        log.warning(f"_fetch_candles {coin}/{interval}/{days}d: {e}")
+        out = sorted(out, key=lambda x: x["t"])
+        # persist to disk — never downloaded again until cache is deleted
+        try:
+            with open(path, "w") as fh:
+                json.dump(out, fh)
+            log.info(f"[BT] Downloaded {coin}/{interval}: {len(out)} candles → saved to disk")
+        except Exception as exc:
+            log.warning(f"[BT] Disk cache write error {path}: {exc}")
+        return out
+    except Exception as exc:
+        log.warning(f"_fetch_candles {coin}/{interval}: {exc}")
         return []
 
 
@@ -196,7 +241,7 @@ def _bt_crossover(cfg, candles_cache: dict, days: int) -> dict:
     all_events  = []   # (ts, pnl_usd)
     all_trades  = []
 
-    coin_equity = INITIAL_EQUITY / len(bt_coins)
+    coin_equity = INITIAL_EQUITY  # full $10K per coin — matches optimizer model
 
     for coin in bt_coins:
         key = f"{coin}_{bt_interval}"
@@ -285,7 +330,7 @@ def _bt_liq(cfg, candles_cache: dict, days: int) -> dict:
 
     all_events = []
     all_trades = []
-    coin_equity = INITIAL_EQUITY / len(bt_coins)
+    coin_equity = INITIAL_EQUITY  # full $10K per coin — matches optimizer model
 
     for coin in bt_coins:
         key = f"{coin}_1h"
