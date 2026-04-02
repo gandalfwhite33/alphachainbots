@@ -1223,11 +1223,15 @@ let _btPeriod = null, _btPoll = null;
 const _eqCharts = {};
 let _btBarChart = null;
 let _btResults = null; // latest backtest results (used by Control Center)
+let _btCoins   = '';   // coins param used in last backtest run
 const BT_PERIOD_LBL = {'3m':'3 Meses','6m':'6 Meses','1y':'1 Año','max':'Máximo'};
 
 function btLoad(period){
-  if(_btPeriod === period) return;
+  const coinsParam = [..._ctrlCoins].sort().join(',');
+  // Use period+coins as cache key so changing coins always triggers a fresh run
+  if(_btPeriod === period && _btCoins === coinsParam) return;
   _btPeriod = period;
+  _btCoins  = coinsParam;
   document.querySelectorAll('.bt-tab').forEach((b,i)=>{
     b.classList.toggle('active', ['3m','6m','1y','max'][i]===period);
   });
@@ -1236,15 +1240,15 @@ function btLoad(period){
   resEl.style.display = 'none';
   progEl.style.display = 'block';
   document.getElementById('bt-pbar').style.width = '0%';
-  document.getElementById('bt-status').textContent = 'Iniciando backtest en segundo plano…';
-  fetch('/api/backtest/start?period='+period).catch(()=>{});
+  document.getElementById('bt-status').textContent = 'Iniciando backtest en segundo plano\u2026';
+  fetch('/api/backtest/start?period='+period+'&coins='+coinsParam).catch(()=>{});
   clearInterval(_btPoll);
   _btPoll = setInterval(btPollOnce, 2500);
 }
 
 function btPollOnce(){
   if(!_btPeriod) return;
-  fetch('/api/backtest?period='+_btPeriod)
+  fetch('/api/backtest?period='+_btPeriod+'&coins='+(_btCoins||''))
     .then(r=>r.json())
     .then(d=>{
       const pct = d.progress ?? 0;
@@ -1416,9 +1420,13 @@ class DashHandler(BaseHTTPRequestHandler):
             period = "3m"
             if "period=" in self.path:
                 period = self.path.split("period=")[-1].split("&")[0].strip()
+            coins = ""
+            if "coins=" in self.path:
+                raw = self.path.split("coins=")[-1].split("&")[0].strip()
+                coins = ",".join(c.strip() for c in raw.split(",") if c.strip().isalnum())
             data = {
-                "progress": backtest_engine.get_progress(period),
-                "result":   backtest_engine.get_result(period),
+                "progress": backtest_engine.get_progress(period, coins),
+                "result":   backtest_engine.get_result(period, coins),
             }
             self._respond(200, "application/json", json.dumps(data).encode())
 
@@ -1428,7 +1436,11 @@ class DashHandler(BaseHTTPRequestHandler):
                 period = self.path.split("period=")[-1].split("&")[0].strip()
             if period not in ("3m", "6m", "1y", "max"):
                 period = "3m"
-            backtest_engine.run_backtest_bg(period)
+            coins = ""
+            if "coins=" in self.path:
+                raw = self.path.split("coins=")[-1].split("&")[0].strip()
+                coins = ",".join(c.strip() for c in raw.split(",") if c.strip().isalnum())
+            backtest_engine.run_backtest_bg(period, coins)
             self._respond(200, "application/json", b'{"ok":true}')
 
         elif path in ("/", "/index.html"):

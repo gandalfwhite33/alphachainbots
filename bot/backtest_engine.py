@@ -180,11 +180,12 @@ def _downsample(snaps: list, target: int) -> list:
 
 # ── EMA / SMA CROSSOVER BACKTEST ───────────────────────────────────────────────
 
-def _bt_crossover(cfg, candles_cache: dict, days: int) -> dict:
+def _bt_crossover(cfg, candles_cache: dict, days: int,
+                  coins_override: list = None) -> dict:
     """
     Backtest for EMA/SMA crossover bots.
-    cfg: BotConfig — uses label, ma_type, ma_fast, ma_slow, trailing_pct, leverage,
-                     risk_per_trade, sl_type, fixed_sl_pct, time_filter, rsi_filter, coins
+    coins_override: if provided, use these coins instead of cfg.coins (from dashboard selection).
+    Each coin gets full INITIAL_EQUITY — same model as the optimizer.
     """
     bt_interval = BT_INTERVAL_MAP.get(cfg.interval, "1h")
     leverage    = getattr(cfg, "leverage", BT_LEVERAGE)
@@ -197,12 +198,14 @@ def _bt_crossover(cfg, candles_cache: dict, days: int) -> dict:
 
     from sim_engine import FALLBACK_COINS
 
-    # Each coin gets the full INITIAL_EQUITY — same model as the optimizer.
-    # Optimizer assigns coin_equity = INITIAL_EQUITY per coin and accumulates
-    # PnL across all coins, reporting total as % of INITIAL_EQUITY.
-    # This means 10 coins each earning +15% = +150% reported total — correct behavior.
-    bt_coins    = getattr(cfg, "coins", None) or FALLBACK_COINS[:10]
-    coin_equity = INITIAL_EQUITY  # full $10K per coin, NOT divided
+    # Priority: explicit override (from dashboard coin selection) > cfg.coins > all top coins
+    if coins_override:
+        bt_coins = coins_override
+    elif getattr(cfg, "coins", None):
+        bt_coins = cfg.coins
+    else:
+        bt_coins = FALLBACK_COINS[:10]
+    coin_equity = INITIAL_EQUITY  # full $10K per coin — matches optimizer model
 
     all_events: list = []
     all_trades: list = []
@@ -478,34 +481,46 @@ _running:  set           = set()
 _bt_lock:  threading.Lock = threading.Lock()
 
 
-def get_progress(period: str) -> int:
-    return _progress.get(period, 0)
+def _cache_key(period: str, coins: str) -> str:
+    return f"{period}|{coins}" if coins else period
 
 
-def get_result(period: str) -> Optional[dict]:
-    return _cache.get(period)
+def get_progress(period: str, coins: str = "") -> int:
+    return _progress.get(_cache_key(period, coins), 0)
 
 
-def is_running(period: str) -> bool:
-    return period in _running
+def get_result(period: str, coins: str = "") -> Optional[dict]:
+    return _cache.get(_cache_key(period, coins))
 
 
-def run_backtest_bg(period: str):
-    """Start background backtest if not already running or cached."""
+def is_running(period: str, coins: str = "") -> bool:
+    return _cache_key(period, coins) in _running
+
+
+def run_backtest_bg(period: str, coins: str = ""):
+    """Start background backtest.
+    coins: comma-separated list of coins to override cfg.coins (e.g. 'BTC,ETH').
+           Empty string = use each bot's own cfg.coins / FALLBACK_COINS[:10].
+    """
+    key = _cache_key(period, coins)
     with _bt_lock:
-        if period in _running or period in _cache:
+        if key in _running or key in _cache:
             return
-        _running.add(period)
-        _progress[period] = 1
-    t = threading.Thread(target=_run, args=(period,),
-                         daemon=True, name=f"bt_{period}")
+        _running.add(key)
+        _progress[key] = 1
+    t = threading.Thread(target=_run, args=(period, coins),
+                         daemon=True, name=f"bt_{key}")
     t.start()
 
 
-def _run(period: str):
+def _run(period: str, coins: str = ""):
+    key = _cache_key(period, coins)
+    # Parse override coin list
+    coins_override = [c.strip() for c in coins.split(",") if c.strip()] if coins else []
+
     try:
         days = PERIODS.get(period, 90)
-        log.info(f"[BT] Starting backtest period={period} days={days}")
+        log.info(f"[BT] Starting backtest period={period} coins={coins or 'default'} days={days}")
 
         from sim_engine import CONFIGS, LIQ_CONFIGS, FALLBACK_COINS
 
@@ -513,10 +528,11 @@ def _run(period: str):
         needed = set()
         for cfg in CONFIGS:
             iv = BT_INTERVAL_MAP.get(cfg.interval, "1h")
-            bt_coins_cfg = cfg.coins if getattr(cfg, "coins", None) else FALLBACK_COINS[:10]
-            for coin in bt_coins_cfg:
+            # Use override coins if provided, else bot's own coins / fallback
+            run_coins = coins_override or (cfg.coins if getattr(cfg, "coins", None) else FALLBACK_COINS[:10])
+            for coin in run_coins:
                 needed.add((coin, iv))
-        for coin in ["BTC", "ETH", "SOL", "XRP"]:
+        for coin in (coins_override or ["BTC", "ETH", "SOL", "XRP"]):
             needed.add((coin, "1h"))
 
         needed      = list(needed)
@@ -526,21 +542,21 @@ def _run(period: str):
         def _upd(n: int = 1):
             nonlocal done
             done += n
-            _progress[period] = min(99, int(done / total_steps * 100))
+            _progress[key] = min(99, int(done / total_steps * 100))
 
         # Fetch candles (with rate-limit courtesy sleep)
         candles_cache = {}
         for coin, iv in needed:
-            key = f"{coin}_{iv}"
-            if key not in candles_cache:
-                candles_cache[key] = _fetch_candles(coin, iv, days)
+            ck = f"{coin}_{iv}"
+            if ck not in candles_cache:
+                candles_cache[ck] = _fetch_candles(coin, iv, days)
                 time.sleep(0.12)
             _upd()
 
         # Backtest EMA/SMA bots
         results = []
         for cfg in CONFIGS:
-            r = _bt_crossover(cfg, candles_cache, days)
+            r = _bt_crossover(cfg, candles_cache, days, coins_override=coins_override or None)
             r["label"]    = cfg.label
             r["strategy"] = f"{cfg.ma_type.upper()} {cfg.ma_fast}/{cfg.ma_slow}"
             r["interval"] = cfg.interval
@@ -563,19 +579,20 @@ def _run(period: str):
         results.sort(key=lambda x: x["total_pnl"], reverse=True)
 
         with _bt_lock:
-            _cache[period] = {
+            _cache[key] = {
                 "period":       period,
+                "coins":        coins or "default",
                 "days":         days,
                 "bots":         results,
                 "computed_at":  time.strftime("%Y-%m-%d %H:%M:%S"),
             }
-            _progress[period] = 100
-            _running.discard(period)
+            _progress[key] = 100
+            _running.discard(key)
 
-        log.info(f"[BT] Done period={period} bots={len(results)}")
+        log.info(f"[BT] Done period={period} coins={coins or 'default'} bots={len(results)}")
 
     except Exception as exc:
-        log.error(f"[BT] Error period={period}: {exc}", exc_info=True)
+        log.error(f"[BT] Error period={period} coins={coins}: {exc}", exc_info=True)
         with _bt_lock:
-            _progress[period] = -1
-            _running.discard(period)
+            _progress[key] = -1
+            _running.discard(key)
