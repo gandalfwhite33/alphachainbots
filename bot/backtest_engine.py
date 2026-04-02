@@ -24,14 +24,13 @@ PERIODS = {"3m": 90, "6m": 180, "1y": 365, "max": 900}
 
 INTERVAL_MS = {
     "15m": 900_000, "30m": 1_800_000,
-    "1h": 3_600_000, "2h": 7_200_000, "4h": 14_400_000,
+    "1h": 3_600_000, "4h": 14_400_000,
 }
 
-# 15m/30m → map to 1h (too many candles for long periods)
-# 1h/2h/4h → use native interval so MA periods match the optimizer exactly
+# 15m/30m → too many candles for long periods, map to coarser for backtest
 BT_INTERVAL_MAP = {
     "15m": "1h", "30m": "1h",
-    "1h":  "1h", "2h":  "2h", "4h":  "4h",
+    "1h":  "1h", "4h":  "4h",
 }
 
 # ── CANDLE FETCH ───────────────────────────────────────────────────────────────
@@ -180,35 +179,24 @@ def _downsample(snaps: list, target: int) -> list:
 
 # ── EMA / SMA CROSSOVER BACKTEST ───────────────────────────────────────────────
 
-def _bt_crossover(cfg, candles_cache: dict, days: int,
-                  coins_override: list = None) -> dict:
+def _bt_crossover(cfg, candles_cache: dict, days: int) -> dict:
     """
     Backtest for EMA/SMA crossover bots.
-    coins_override: if provided, use these coins instead of cfg.coins (from dashboard selection).
-    Each coin gets full INITIAL_EQUITY — same model as the optimizer.
+    cfg: BotConfig — uses label, ma_type, ma_fast, ma_slow, trailing_pct, leverage, risk_per_trade
     """
     bt_interval = BT_INTERVAL_MAP.get(cfg.interval, "1h")
     leverage    = getattr(cfg, "leverage", BT_LEVERAGE)
     risk_pct    = getattr(cfg, "risk_per_trade", RISK_PCT)
     trailing    = cfg.trailing_pct
-    sl_type     = getattr(cfg, "sl_type", "trailing")
-    fixed_sl    = getattr(cfg, "fixed_sl_pct", 0.02)
-    time_filter = getattr(cfg, "time_filter", "none")
-    rsi_filter  = getattr(cfg, "rsi_filter", "none")
 
+    # Use top coins to spread capital evenly
     from sim_engine import FALLBACK_COINS
+    bt_coins = FALLBACK_COINS[:6]
 
-    # Priority: explicit override (from dashboard coin selection) > cfg.coins > all top coins
-    if coins_override:
-        bt_coins = coins_override
-    elif getattr(cfg, "coins", None):
-        bt_coins = cfg.coins
-    else:
-        bt_coins = FALLBACK_COINS[:10]
-    coin_equity = INITIAL_EQUITY  # full $10K per coin — matches optimizer model
+    all_events  = []   # (ts, pnl_usd)
+    all_trades  = []
 
-    all_events: list = []
-    all_trades: list = []
+    coin_equity = INITIAL_EQUITY / len(bt_coins)
 
     for coin in bt_coins:
         key = f"{coin}_{bt_interval}"
@@ -226,19 +214,16 @@ def _bt_crossover(cfg, candles_cache: dict, days: int,
             fast_s = _sma(closes, cfg.ma_fast)
             slow_s = _sma(closes, cfg.ma_slow)
 
-        rsi_s = _rsi(closes, 14) if rsi_filter != "none" else []
-
         off_f = len(closes) - len(fast_s)
         off_s = len(closes) - len(slow_s)
-        off_r = len(closes) - len(rsi_s) if rsi_s else 0
         start = max(off_f, off_s) + 1
 
-        in_pos = False
-        dir_   = ""
-        entry  = 0.0
-        best   = 0.0
-        stop   = 0.0
-        eq_c   = coin_equity
+        in_pos  = False
+        dir_    = ""
+        entry   = 0.0
+        best    = 0.0
+        stop    = 0.0
+        eq_coin = coin_equity
 
         for i in range(start, len(df)):
             fi = i - off_f
@@ -252,76 +237,33 @@ def _bt_crossover(cfg, candles_cache: dict, days: int,
             sc    = slow_s[si];  sp = slow_s[si - 1]
 
             if in_pos:
-                exited = False
-                pnl    = 0.0
-
-                if sl_type == "fixed":
-                    sl_px = entry * (1 - fixed_sl) if dir_ == "long" else entry * (1 + fixed_sl)
-                    if dir_ == "long" and price <= sl_px:
-                        pnl = eq_c * risk_pct * (price - entry) / entry * leverage
-                        exited = True
-                    elif dir_ == "short" and price >= sl_px:
-                        pnl = eq_c * risk_pct * (entry - price) / entry * leverage
-                        exited = True
-                else:  # trailing or atr — both use trailing stop logic here
-                    if dir_ == "long":
-                        if price > best:
-                            best = price; stop = best * (1 - trailing)
-                        if price <= stop:
-                            pnl = eq_c * risk_pct * (price - entry) / entry * leverage
-                            exited = True
-                    else:
-                        if price < best:
-                            best = price; stop = best * (1 + trailing)
-                        if price >= stop:
-                            pnl = eq_c * risk_pct * (entry - price) / entry * leverage
-                            exited = True
-
-                # MA reverse crossover exit (applies regardless of sl_type)
-                if not exited and fi >= 1 and si >= 1:
-                    if dir_ == "long" and fp >= sp and fc < sc:
-                        pnl = eq_c * risk_pct * (price - entry) / entry * leverage
-                        exited = True
-                    elif dir_ == "short" and fp <= sp and fc > sc:
-                        pnl = eq_c * risk_pct * (entry - price) / entry * leverage
-                        exited = True
-
-                if exited:
-                    eq_c += pnl
-                    all_events.append((ts, pnl))
-                    all_trades.append({"pnl": round(pnl, 2)})
-                    in_pos = False
+                if dir_ == "long":
+                    if price > best:
+                        best = price; stop = best * (1 - trailing)
+                    if price <= stop:
+                        pnl = eq_coin * risk_pct * (price - entry) / entry * leverage
+                        eq_coin += pnl
+                        all_events.append((ts, pnl))
+                        all_trades.append({"pnl": round(pnl, 2)})
+                        in_pos = False
+                else:
+                    if price < best:
+                        best = price; stop = best * (1 + trailing)
+                    if price >= stop:
+                        pnl = eq_coin * risk_pct * (entry - price) / entry * leverage
+                        eq_coin += pnl
+                        all_events.append((ts, pnl))
+                        all_trades.append({"pnl": round(pnl, 2)})
+                        in_pos = False
 
             if not in_pos:
                 up   = fp <= sp and fc > sc
                 down = fp >= sp and fc < sc
-                if not (up or down):
-                    continue
-
-                # Time filter — skip new entries outside session hours
-                if time_filter == "asia":
-                    if (ts // 3_600_000) % 24 >= 9:
-                        continue
-                elif time_filter == "london_ny":
-                    if (ts // 3_600_000) % 24 not in range(7, 22):
-                        continue
-
-                # RSI filter
-                if rsi_filter != "none" and rsi_s:
-                    ri = i - off_r
-                    if 0 <= ri < len(rsi_s):
-                        rv = rsi_s[ri]
-                        if rsi_filter == "rsi50":
-                            if up and rv <= 50: continue
-                            if down and rv >= 50: continue
-                        elif rsi_filter == "rsi55":
-                            if up and rv <= 55: continue
-                            if down and rv >= 45: continue
-
-                in_pos = True
-                dir_   = "long" if up else "short"
-                entry  = price; best = price
-                stop   = entry * (1 - trailing) if dir_ == "long" else entry * (1 + trailing)
+                if up or down:
+                    in_pos = True
+                    dir_   = "long" if up else "short"
+                    entry  = price; best = price
+                    stop   = entry * (1 - trailing) if dir_ == "long" else entry * (1 + trailing)
 
     return _build_result(all_events, all_trades, days)
 
@@ -481,46 +423,34 @@ _running:  set           = set()
 _bt_lock:  threading.Lock = threading.Lock()
 
 
-def _cache_key(period: str, coins: str) -> str:
-    return f"{period}|{coins}" if coins else period
+def get_progress(period: str) -> int:
+    return _progress.get(period, 0)
 
 
-def get_progress(period: str, coins: str = "") -> int:
-    return _progress.get(_cache_key(period, coins), 0)
+def get_result(period: str) -> Optional[dict]:
+    return _cache.get(period)
 
 
-def get_result(period: str, coins: str = "") -> Optional[dict]:
-    return _cache.get(_cache_key(period, coins))
+def is_running(period: str) -> bool:
+    return period in _running
 
 
-def is_running(period: str, coins: str = "") -> bool:
-    return _cache_key(period, coins) in _running
-
-
-def run_backtest_bg(period: str, coins: str = ""):
-    """Start background backtest.
-    coins: comma-separated list of coins to override cfg.coins (e.g. 'BTC,ETH').
-           Empty string = use each bot's own cfg.coins / FALLBACK_COINS[:10].
-    """
-    key = _cache_key(period, coins)
+def run_backtest_bg(period: str):
+    """Start background backtest if not already running or cached."""
     with _bt_lock:
-        if key in _running or key in _cache:
+        if period in _running or period in _cache:
             return
-        _running.add(key)
-        _progress[key] = 1
-    t = threading.Thread(target=_run, args=(period, coins),
-                         daemon=True, name=f"bt_{key}")
+        _running.add(period)
+        _progress[period] = 1
+    t = threading.Thread(target=_run, args=(period,),
+                         daemon=True, name=f"bt_{period}")
     t.start()
 
 
-def _run(period: str, coins: str = ""):
-    key = _cache_key(period, coins)
-    # Parse override coin list
-    coins_override = [c.strip() for c in coins.split(",") if c.strip()] if coins else []
-
+def _run(period: str):
     try:
         days = PERIODS.get(period, 90)
-        log.info(f"[BT] Starting backtest period={period} coins={coins or 'default'} days={days}")
+        log.info(f"[BT] Starting backtest period={period} days={days}")
 
         from sim_engine import CONFIGS, LIQ_CONFIGS, FALLBACK_COINS
 
@@ -528,11 +458,9 @@ def _run(period: str, coins: str = ""):
         needed = set()
         for cfg in CONFIGS:
             iv = BT_INTERVAL_MAP.get(cfg.interval, "1h")
-            # Use override coins if provided, else bot's own coins / fallback
-            run_coins = coins_override or (cfg.coins if getattr(cfg, "coins", None) else FALLBACK_COINS[:10])
-            for coin in run_coins:
+            for coin in FALLBACK_COINS[:6]:
                 needed.add((coin, iv))
-        for coin in (coins_override or ["BTC", "ETH", "SOL", "XRP"]):
+        for coin in ["BTC", "ETH", "SOL", "XRP"]:
             needed.add((coin, "1h"))
 
         needed      = list(needed)
@@ -542,21 +470,21 @@ def _run(period: str, coins: str = ""):
         def _upd(n: int = 1):
             nonlocal done
             done += n
-            _progress[key] = min(99, int(done / total_steps * 100))
+            _progress[period] = min(99, int(done / total_steps * 100))
 
         # Fetch candles (with rate-limit courtesy sleep)
         candles_cache = {}
         for coin, iv in needed:
-            ck = f"{coin}_{iv}"
-            if ck not in candles_cache:
-                candles_cache[ck] = _fetch_candles(coin, iv, days)
+            key = f"{coin}_{iv}"
+            if key not in candles_cache:
+                candles_cache[key] = _fetch_candles(coin, iv, days)
                 time.sleep(0.12)
             _upd()
 
         # Backtest EMA/SMA bots
         results = []
         for cfg in CONFIGS:
-            r = _bt_crossover(cfg, candles_cache, days, coins_override=coins_override or None)
+            r = _bt_crossover(cfg, candles_cache, days)
             r["label"]    = cfg.label
             r["strategy"] = f"{cfg.ma_type.upper()} {cfg.ma_fast}/{cfg.ma_slow}"
             r["interval"] = cfg.interval
@@ -579,20 +507,19 @@ def _run(period: str, coins: str = ""):
         results.sort(key=lambda x: x["total_pnl"], reverse=True)
 
         with _bt_lock:
-            _cache[key] = {
+            _cache[period] = {
                 "period":       period,
-                "coins":        coins or "default",
                 "days":         days,
                 "bots":         results,
                 "computed_at":  time.strftime("%Y-%m-%d %H:%M:%S"),
             }
-            _progress[key] = 100
-            _running.discard(key)
+            _progress[period] = 100
+            _running.discard(period)
 
-        log.info(f"[BT] Done period={period} coins={coins or 'default'} bots={len(results)}")
+        log.info(f"[BT] Done period={period} bots={len(results)}")
 
     except Exception as exc:
-        log.error(f"[BT] Error period={period} coins={coins}: {exc}", exc_info=True)
+        log.error(f"[BT] Error period={period}: {exc}", exc_info=True)
         with _bt_lock:
-            _progress[key] = -1
-            _running.discard(key)
+            _progress[period] = -1
+            _running.discard(period)
