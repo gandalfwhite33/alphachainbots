@@ -46,8 +46,7 @@ a{color:inherit;text-decoration:none}
 .grid3{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
 
 /* ── BOT CARDS ── */
-.card{background:#0b0f1c;border:1px solid #162030;border-radius:6px;padding:13px;border-left:3px solid #37505f;cursor:pointer;transition:border-color .2s}
-.card:hover{border-color:#2a4a6a}
+.card{background:#0b0f1c;border:1px solid #162030;border-radius:6px;padding:13px;border-left:3px solid #37505f}
 .card.c0{border-left-color:#4fc3f7}.card.c1{border-left-color:#ffd740}
 .card.c2{border-left-color:#69f0ae}.card.c3{border-left-color:#ff6b6b}
 .card.c4{border-left-color:#ce93d8}.card.c5{border-left-color:#ffab40}
@@ -112,51 +111,12 @@ tr:hover td{background:#0d1420}
 .hmap-tab.active{background:#0d2030;border-color:#4fc3f7;color:#4fc3f7}
 .hmap-pane{display:none}.hmap-pane.active{display:block}
 .hmap-canvas-wrap{position:relative;height:280px}
-.hmap-nodata{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#263a4a;font-size:12px;pointer-events:none;background:#07090f}
 .hmap-danger{font-size:10px;color:#ff6b6b;margin-top:4px;min-height:16px}
 /* OI/Funding compact table */
 .oi-pos{color:#00e676}.oi-neg{color:#ff4466}.oi-nu{color:#78909c}
 .fund-pos{color:#00e676;font-weight:bold}.fund-neg{color:#ff4466;font-weight:bold}.fund-nu{color:#546e7a}
 .ls-bull{color:#69f0ae}.ls-bear{color:#ff6b6b}
 .oi-icon{font-size:11px;margin-right:2px}
-
-/* ── EXECUTIVE BAR ── */
-.exec-bar{background:#08101c;border:1px solid #162030;border-radius:6px;padding:10px 18px;margin-bottom:12px;display:flex;gap:24px;flex-wrap:wrap;align-items:center}
-.exec-item{text-align:center;min-width:80px}
-.exec-lbl{font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:#37505f;margin-bottom:3px}
-.exec-val{font-size:22px;font-weight:bold;line-height:1}
-.exec-val.big{font-size:28px}
-.exec-sub{font-size:10px;color:#546e7a;margin-top:2px}
-.exec-div{width:1px;background:#162030;align-self:stretch;margin:0 4px}
-@media(max-width:700px){.exec-bar{gap:14px}.exec-val.big{font-size:20px}}
-
-/* ── FILTER BAR ── */
-.flt-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
-.flt-lbl{font-size:10px;color:#37505f;text-transform:uppercase;letter-spacing:1px;margin-right:4px}
-.flt-btn{padding:4px 12px;border:1px solid #1e3a4a;border-radius:3px;font-size:11px;font-weight:bold;cursor:pointer;background:#0a0f1c;color:#546e7a;transition:all .2s;letter-spacing:.5px;font-family:inherit}
-.flt-btn.active{background:#0d2030;border-color:#4fc3f7;color:#4fc3f7}
-.flt-btn:hover{border-color:#37505f;color:#c9d4e0}
-
-/* ── TRADINGVIEW MODAL ── */
-.tv-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:1000;align-items:center;justify-content:center}
-.tv-overlay.open{display:flex}
-.tv-modal{background:#0b0f1c;border:1px solid #1e3a4a;border-radius:8px;width:90vw;max-width:1100px;height:82vh;display:flex;flex-direction:column;overflow:hidden}
-.tv-modal-hdr{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border-bottom:1px solid #162030;font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#37505f;flex-shrink:0}
-.tv-modal-title{color:#4fc3f7;letter-spacing:2px}
-.tv-close{background:none;border:1px solid #1e3a4a;color:#78909c;cursor:pointer;border-radius:3px;padding:3px 10px;font-size:12px;font-family:inherit;transition:all .2s}
-.tv-close:hover{border-color:#ff6b6b;color:#ff6b6b}
-#tv-container{flex:1;min-height:0}
-#tv-container iframe{width:100%;height:100%;border:none}
-
-/* ── FEAR & GREED ── */
-.fng-wrap{padding:10px;display:flex;align-items:center;gap:16px;border-top:1px solid #0d1520}
-.fng-gauge{flex-shrink:0}
-.fng-info{flex:1}
-.fng-val{font-size:32px;font-weight:bold;line-height:1}
-.fng-lbl{font-size:12px;font-weight:bold;letter-spacing:1px;margin-top:2px}
-.fng-ts{font-size:9px;color:#37505f;margin-top:4px}
-.fng-ef{color:#ff1744}.fng-f{color:#ff6d00}.fng-n{color:#ffd740}
-.fng-g{color:#69f0ae}.fng-eg{color:#00e676}
 
 /* ── BACKTEST ── */
 .bt-ph{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
@@ -173,32 +133,6 @@ tr:hover td{background:#0d1420}
 .bt-eq-meta{display:flex;gap:8px;font-size:9px;color:#546e7a;margin-top:4px;flex-wrap:wrap}
 .bt-sec-title{font-size:11px;color:#4fc3f7;padding:10px 10px 4px;letter-spacing:.5px}
 @media(max-width:580px){.bt-eq-grid{grid-template-columns:1fr}}
-
-/* ── CONTROL CENTER ── */
-.cc-flt{display:flex;gap:6px;flex-wrap:wrap;padding:10px 14px 0;align-items:center}
-.cc-cat{padding:3px 10px;border:1px solid #1e3a4a;border-radius:3px;font-size:11px;font-weight:bold;cursor:pointer;background:#0a0f1c;color:#546e7a;transition:all .2s;font-family:inherit}
-.cc-cat.active{background:#0d2030;border-color:#4fc3f7;color:#4fc3f7}
-.cc-cat:hover{border-color:#37505f;color:#c9d4e0}
-th.srt{cursor:pointer;user-select:none}
-th.srt:hover{color:#4fc3f7}
-th.srt.asc::after{content:' \25B2'}
-th.srt.desc::after{content:' \25BC'}
-
-/* ── CONTROL BAR ── */
-.ctrl-bar{background:#08101c;border:1px solid #162030;border-radius:6px;margin-bottom:12px;padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.ctrl-group{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
-.ctrl-lbl{font-size:9px;color:#37505f;text-transform:uppercase;letter-spacing:1px;white-space:nowrap;margin-right:2px}
-.ctrl-btn{padding:3px 10px;border:1px solid #1e3a4a;border-radius:3px;font-size:11px;font-weight:bold;cursor:pointer;color:#546e7a;background:#0a0f1c;font-family:inherit;transition:all .2s;letter-spacing:.5px}
-.ctrl-btn.active{background:#0d2030;border-color:#4fc3f7;color:#4fc3f7}
-.ctrl-btn:hover{border-color:#37505f;color:#c9d4e0}
-.ctrl-sep{width:1px;background:#162030;align-self:stretch;margin:0 4px}
-.ctrl-apply{padding:5px 18px;border:1px solid #1e4a2a;border-radius:3px;font-size:12px;font-weight:bold;cursor:pointer;background:#071207;color:#69f0ae;font-family:inherit;transition:all .2s}
-.ctrl-apply:hover{border-color:#69f0ae;background:#0a1a0a}
-.ctrl-tag{font-size:10px;color:#37505f;margin-left:6px;letter-spacing:.3px}
-/* ── CARD STATS ── */
-.card-micro{position:relative;height:52px;margin:4px 0 2px}
-.card-filtpnl{font-size:12px;margin-bottom:2px}
-.card-tag{font-size:9px;color:#37505f;margin-top:3px;letter-spacing:.2px}
 </style>
 </head>
 <body>
@@ -211,40 +145,6 @@ th.srt.desc::after{content:' \25BC'}
 </div>
 
 <div class="wrap">
-
-  <!-- ── EXECUTIVE SUMMARY BAR ──────────────────────────────────────────────── -->
-  <div class="exec-bar" id="exec-bar">
-    <div class="exec-item">
-      <div class="exec-lbl">PnL HOY</div>
-      <div class="exec-val big nu" id="exec-pnl-day">—</div>
-      <div class="exec-sub" id="exec-pnl-day-pct"></div>
-    </div>
-    <div class="exec-div"></div>
-    <div class="exec-item">
-      <div class="exec-lbl">Mejor Bot</div>
-      <div class="exec-val up" id="exec-best" style="font-size:13px;padding-top:4px">—</div>
-      <div class="exec-sub" id="exec-best-pnl"></div>
-    </div>
-    <div class="exec-div"></div>
-    <div class="exec-item">
-      <div class="exec-lbl">Peor Bot</div>
-      <div class="exec-val dn" id="exec-worst" style="font-size:13px;padding-top:4px">—</div>
-      <div class="exec-sub" id="exec-worst-pnl"></div>
-    </div>
-    <div class="exec-div"></div>
-    <div class="exec-item">
-      <div class="exec-lbl">Posiciones</div>
-      <div class="exec-val nu" id="exec-openpos">—</div>
-      <div class="exec-sub">abiertas ahora</div>
-    </div>
-    <div class="exec-div"></div>
-    <div class="exec-item">
-      <div class="exec-lbl">Bots en &#x2B;</div>
-      <div class="exec-val nu" id="exec-pos-pct">—</div>
-      <div class="exec-sub" id="exec-pos-sub"></div>
-    </div>
-  </div>
-  <!-- ── FIN EXECUTIVE BAR ────────────────────────────────────────────────── -->
 
   <!-- ── MARKET DATA SECTION ─────────────────────────────────────────────── -->
   <div class="mkt-grid">
@@ -260,12 +160,6 @@ th.srt.desc::after{content:' \25BC'}
           <button class="hmap-tab active" onclick="switchTab('BTC')">BTC</button>
           <button class="hmap-tab" onclick="switchTab('ETH')">ETH</button>
           <button class="hmap-tab" onclick="switchTab('SOL')">SOL</button>
-          <button class="hmap-tab" onclick="switchTab('AVAX')">AVAX</button>
-          <button class="hmap-tab" onclick="switchTab('DOGE')">DOGE</button>
-          <button class="hmap-tab" onclick="switchTab('ARB')">ARB</button>
-          <button class="hmap-tab" onclick="switchTab('OP')">OP</button>
-          <button class="hmap-tab" onclick="switchTab('WIF')">WIF</button>
-          <button class="hmap-tab" onclick="switchTab('SUI')">SUI</button>
         </div>
         <div id="hpane-BTC" class="hmap-pane active">
           <div class="hmap-canvas-wrap"><canvas id="hchart-BTC"></canvas></div>
@@ -278,30 +172,6 @@ th.srt.desc::after{content:' \25BC'}
         <div id="hpane-SOL" class="hmap-pane">
           <div class="hmap-canvas-wrap"><canvas id="hchart-SOL"></canvas></div>
           <div class="hmap-danger" id="hdanger-SOL"></div>
-        </div>
-        <div id="hpane-AVAX" class="hmap-pane">
-          <div class="hmap-canvas-wrap"><canvas id="hchart-AVAX"></canvas></div>
-          <div class="hmap-danger" id="hdanger-AVAX"></div>
-        </div>
-        <div id="hpane-DOGE" class="hmap-pane">
-          <div class="hmap-canvas-wrap"><canvas id="hchart-DOGE"></canvas></div>
-          <div class="hmap-danger" id="hdanger-DOGE"></div>
-        </div>
-        <div id="hpane-ARB" class="hmap-pane">
-          <div class="hmap-canvas-wrap"><canvas id="hchart-ARB"></canvas></div>
-          <div class="hmap-danger" id="hdanger-ARB"></div>
-        </div>
-        <div id="hpane-OP" class="hmap-pane">
-          <div class="hmap-canvas-wrap"><canvas id="hchart-OP"></canvas></div>
-          <div class="hmap-danger" id="hdanger-OP"></div>
-        </div>
-        <div id="hpane-WIF" class="hmap-pane">
-          <div class="hmap-canvas-wrap"><canvas id="hchart-WIF"></canvas></div>
-          <div class="hmap-danger" id="hdanger-WIF"></div>
-        </div>
-        <div id="hpane-SUI" class="hmap-pane">
-          <div class="hmap-canvas-wrap"><canvas id="hchart-SUI"></canvas></div>
-          <div class="hmap-danger" id="hdanger-SUI"></div>
         </div>
       </div>
     </div>
@@ -319,59 +189,21 @@ th.srt.desc::after{content:' \25BC'}
           <tbody id="oi-body"><tr><td colspan="7" class="empty">Cargando&hellip;</td></tr></tbody>
         </table>
       </div>
-      <!-- Fear & Greed -->
-      <div class="fng-wrap" id="fng-wrap">
-        <svg class="fng-gauge" id="fng-svg" viewBox="0 0 160 90" width="160" height="90">
-          <!-- arcs filled by JS -->
-          <g id="fng-arcs"></g>
-          <line id="fng-needle" x1="80" y1="80" x2="80" y2="18" stroke="#c9d4e0" stroke-width="2.5" stroke-linecap="round"/>
-          <circle cx="80" cy="80" r="5" fill="#c9d4e0"/>
-          <text id="fng-num-svg" x="80" y="76" text-anchor="middle" font-size="13" font-weight="bold" fill="#c9d4e0">—</text>
-        </svg>
-        <div class="fng-info">
-          <div class="fng-val nu" id="fng-val">—</div>
-          <div class="fng-lbl nu" id="fng-lbl">Cargando&hellip;</div>
-          <div class="fng-ts" id="fng-ts"></div>
-        </div>
-      </div>
     </div>
 
   </div>
   <!-- ── FIN MARKET DATA ─────────────────────────────────────────────────── -->
 
-  <!-- ── CONTROL BAR ─────────────────────────────────────────────────────── -->
-  <div class="ctrl-bar" id="ctrl-bar">
-    <div class="ctrl-group">
-      <span class="ctrl-lbl">Periodo:</span>
-      <button class="ctrl-btn active" onclick="selectPeriod('3m',this)">3M</button>
-      <button class="ctrl-btn" onclick="selectPeriod('6m',this)">6M</button>
-      <button class="ctrl-btn" onclick="selectPeriod('1y',this)">1A</button>
-      <button class="ctrl-btn" onclick="selectPeriod('max',this)">M&Aacute;X</button>
-    </div>
-    <div class="ctrl-sep"></div>
-    <div class="ctrl-group">
-      <span class="ctrl-lbl">Monedas:</span>
-      <button class="ctrl-btn active" onclick="toggleCtrlCoin('BTC',this)">BTC</button>
-      <button class="ctrl-btn" onclick="toggleCtrlCoin('ETH',this)">ETH</button>
-      <button class="ctrl-btn" onclick="toggleCtrlCoin('SOL',this)">SOL</button>
-      <button class="ctrl-btn" onclick="toggleCtrlCoin('ARB',this)">ARB</button>
-      <button class="ctrl-btn" onclick="toggleCtrlCoin('OP',this)">OP</button>
-      <button class="ctrl-btn" onclick="toggleCtrlCoin('AVAX',this)">AVAX</button>
-      <button class="ctrl-btn" onclick="toggleCtrlCoin('DOGE',this)">DOGE</button>
-      <button class="ctrl-btn" onclick="toggleCtrlCoin('WIF',this)">WIF</button>
-      <button class="ctrl-btn" onclick="toggleCtrlCoin('SUI',this)">SUI</button>
-    </div>
-    <div class="ctrl-sep"></div>
-    <button class="ctrl-apply" onclick="applyControl()">&#x25BA; Aplicar</button>
-    <span class="ctrl-tag" id="ctrl-tag">&#x1F4CA; BTC &middot; 3M</span>
-  </div>
-  <!-- ── FIN CONTROL BAR ──────────────────────────────────────────────────── -->
-
   <!-- ── BACKTEST SECTION ────────────────────────────────────────────────── -->
   <div class="panel" id="bt-section">
     <div class="ph bt-ph">
       <span>&#x1F4CA; Backtest Hist&oacute;rico</span>
-      <span class="ph-cnt" id="bt-period-hdr"></span>
+      <div class="bt-tabs">
+        <button class="bt-tab active" onclick="btLoad('3m')">3M</button>
+        <button class="bt-tab" onclick="btLoad('6m')">6M</button>
+        <button class="bt-tab" onclick="btLoad('1y')">1A</button>
+        <button class="bt-tab" onclick="btLoad('max')">M&Aacute;X</button>
+      </div>
     </div>
     <div style="padding:10px 10px 4px" id="bt-prog-wrap">
       <div class="bt-pbar-bg"><div class="bt-pbar-fill" id="bt-pbar" style="width:0%"></div></div>
@@ -407,55 +239,6 @@ th.srt.desc::after{content:' \25BC'}
   </div>
   <!-- ── FIN BACKTEST ─────────────────────────────────────────────────────── -->
 
-  <!-- ── CONTROL CENTER ───────────────────────────────────────────────────── -->
-  <div class="panel" id="cc-section">
-    <div class="ph">
-      <span>&#x1F3DB; Control Center &mdash; Ranking Live</span>
-      <span class="ph-cnt" id="cc-cnt"></span>
-    </div>
-    <div class="cc-flt">
-      <span class="flt-lbl">Categor&iacute;a:</span>
-      <button class="cc-cat active" onclick="ccFilter('all',this)">Todos</button>
-      <button class="cc-cat" onclick="ccFilter('Conservador',this)">Conservador</button>
-      <button class="cc-cat" onclick="ccFilter('Equilibrado',this)">Equilibrado</button>
-      <button class="cc-cat" onclick="ccFilter('Alta Frecuencia',this)">Alta Frecuencia</button>
-      <button class="cc-cat" onclick="ccFilter('Liquidaciones',this)">Liquidaciones</button>
-      <button class="cc-cat" onclick="ccFilter('Legacy',this)">Legacy</button>
-    </div>
-    <div class="tbl-wrap" style="padding:0 14px 10px">
-      <table id="cc-table">
-        <thead><tr>
-          <th>#</th>
-          <th class="srt" data-col="label" onclick="ccSort('label')">Nombre</th>
-          <th class="srt" data-col="cat" onclick="ccSort('cat')">Categor&iacute;a</th>
-          <th class="srt" data-col="interval" onclick="ccSort('interval')">TF</th>
-          <th class="srt" data-col="pnl" onclick="ccSort('pnl')">PnL $</th>
-          <th class="srt" data-col="pnl_pct" onclick="ccSort('pnl_pct')">PnL %</th>
-          <th class="srt" data-col="wr" onclick="ccSort('wr')">WinRate%</th>
-          <th class="srt" data-col="dd" onclick="ccSort('dd')">MaxDD%</th>
-          <th class="srt" data-col="sharpe" onclick="ccSort('sharpe')">Sharpe</th>
-          <th class="srt" data-col="score" onclick="ccSort('score')">Score</th>
-          <th>Estado</th>
-        </tr></thead>
-        <tbody id="cc-tbody"><tr><td colspan="11" class="empty">Cargando&hellip;</td></tr></tbody>
-      </table>
-    </div>
-  </div>
-  <!-- ── FIN CONTROL CENTER ────────────────────────────────────────────────── -->
-
-  <!-- ── FILTER BAR ────────────────────────────────────────────────────────── -->
-  <div class="flt-bar">
-    <span class="flt-lbl">Filtrar:</span>
-    <button class="flt-btn active" onclick="applyFilter('all',this)">Todos</button>
-    <button class="flt-btn" onclick="applyFilter('win',this)">&#x2B; Ganadores</button>
-    <button class="flt-btn" onclick="applyFilter('lose',this)">&#x2212; Perdedores</button>
-    <button class="flt-btn" onclick="applyFilter('15m',this)">15m</button>
-    <button class="flt-btn" onclick="applyFilter('30m',this)">30m</button>
-    <button class="flt-btn" onclick="applyFilter('1h',this)">1h</button>
-    <button class="flt-btn" onclick="applyFilter('4h',this)">4h</button>
-    <button class="flt-btn" onclick="applyFilter('liq',this)">Liquidaciones</button>
-  </div>
-
   <div class="grid3" id="bot-cards">
     <div class="card c0"><div class="card-name col0">BOT&middot;4H</div><div class="card-meta">Cargando&hellip;</div></div>
     <div class="card c1"><div class="card-name col1">BOT&middot;1H&middot;EMA</div><div class="card-meta">Cargando&hellip;</div></div>
@@ -487,17 +270,6 @@ th.srt.desc::after{content:' \25BC'}
   </div>
 </div>
 
-<!-- ── TRADINGVIEW MODAL ─────────────────────────────────────────────────── -->
-<div class="tv-overlay" id="tv-overlay" onclick="if(event.target===this)closeTVModal()">
-  <div class="tv-modal">
-    <div class="tv-modal-hdr">
-      <span class="tv-modal-title" id="tv-modal-title">TradingView</span>
-      <button class="tv-close" onclick="closeTVModal()">&#x2715; Cerrar</button>
-    </div>
-    <div id="tv-container"></div>
-  </div>
-</div>
-
 <div class="sbar">
   <span><span class="live">&#9679; LIVE</span> &mdash; refresco cada 30s</span>
   <span id="last-upd"></span>
@@ -517,9 +289,7 @@ function fp(v){ return (v>=0?'+':'')+v.toFixed(2); }
 function fmt(v,d=2){ return Number(v).toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d}); }
 function fmtPx(v){ return v>=1000?fmt(v,2):v>=1?fmt(v,4):fmt(v,6); }
 
-let _lastD = null;
 function render(d){
-  _lastD = d;
   d.bots.sort((a,b)=>b.portfolio.total_pnl - a.portfolio.total_pnl);
   // Header
   const tc=pc(d.total_pnl);
@@ -530,79 +300,30 @@ function render(d){
     <div class="stat"><div class="stat-l">Uptime</div><div class="stat-v nu">${d.uptime}</div></div>
     <div class="stat"><div class="stat-l">Modo</div><div class="stat-v nu">SIMULACI&#211;N</div></div>`;
 
-  // ── Executive Summary Bar ─────────────────────────────────────────────────
-  const today = new Date().toLocaleDateString('es');
-  let dayPnl = 0;
-  d.bots.forEach(b => b.portfolio.history.forEach(t => {
-    if(t.closed_at && t.closed_at.startsWith(today)) dayPnl += (t.pnl||0);
-  }));
-  const dpCls = pc(dayPnl);
-  document.getElementById('exec-pnl-day').className = 'exec-val big '+dpCls;
-  document.getElementById('exec-pnl-day').textContent = (dayPnl>=0?'+':'') + dayPnl.toFixed(2) + '$';
-  const dayPct = d.initial_equity>0 ? dayPnl/d.initial_equity*100 : 0;
-  document.getElementById('exec-pnl-day-pct').textContent = (dayPct>=0?'+':'') + dayPct.toFixed(2) + '%';
-
-  const byPnl = [...d.bots].sort((a,b)=>b.portfolio.total_pnl - a.portfolio.total_pnl);
-  const best  = byPnl[0], worst = byPnl[byPnl.length-1];
-  if(best){
-    document.getElementById('exec-best').textContent = best.label;
-    document.getElementById('exec-best-pnl').textContent = '+$'+best.portfolio.total_pnl.toFixed(0);
-  }
-  if(worst){
-    document.getElementById('exec-worst').textContent = worst.label;
-    document.getElementById('exec-worst-pnl').textContent = '$'+worst.portfolio.total_pnl.toFixed(0);
-  }
-
-  let totalOpen = 0;
-  d.bots.forEach(b => totalOpen += b.portfolio.positions.length);
-  document.getElementById('exec-openpos').textContent = totalOpen;
-
-  const nPos = d.bots.filter(b=>b.portfolio.total_pnl>0).length;
-  const nTot = d.bots.length;
-  const pPct = nTot>0 ? Math.round(nPos/nTot*100) : 0;
-  document.getElementById('exec-pos-pct').className = 'exec-val '+(pPct>=50?'up':'dn');
-  document.getElementById('exec-pos-pct').textContent = pPct+'%';
-  document.getElementById('exec-pos-sub').textContent = nPos+'/'+nTot+' bots';
-
-  // ── Bot cards ─────────────────────────────────────────────────────────────
-  const coinTag = [..._ctrlCoins].join(' \xB7 ');
-  const periodTag = _ctrlPeriod ? _ctrlPeriod.toUpperCase() : '3M';
+  // Bot cards
   document.getElementById('bot-cards').innerHTML=d.bots.map((b,i)=>{
     const p=b.portfolio, cc=COLS[b.idx%18], cv=CARDS[b.idx%18];
-    const ma=b.ma_type==='liq'?'LIQ\xB7'+(b.strategy||'').toUpperCase()
-             :(b.ma_type==='ema'?'EMA':'SMA')+' '+b.ma_fast+'/'+b.ma_slow;
+    const ma=b.ma_type==='liq'?`LIQ·${b.strategy||''}`.toUpperCase()
+             :(b.ma_type==='ema'?'EMA':'SMA')+` ${b.ma_fast}/${b.ma_slow}`;
     const tr=(b.trailing_pct*100).toFixed(1);
+    const wr=p.trades>0?`${p.wins}/${p.trades} wins`:'0 trades';
+    const pc2=pc(p.total_pnl);
     const sBadge=b.status==='escaneando'
       ?'<span class="b b-entry">SCAN</span>'
       :'<span class="b b-wait">'+b.status+'</span>';
-    const bType = b.ma_type==='liq'?'liq':'ema';
-    const firstCoin = (b.coins&&b.coins[0])||'BTC';
-    const fStats = _filteredStats(p, _ctrlCoins);
-    const fPnlCls = pc(fStats.pnl);
-    const hasMini = fStats.hist.length >= 2;
-    return `<div class="card ${cv}" data-interval="${b.interval}" data-pnl-pos="${p.total_pnl>=0?1:0}" data-type="${bType}"
-      onclick="openTVModal('${firstCoin}','${b.interval}','${b.label}')">
+    return `<div class="card ${cv}">
       <div class="card-name ${cc}">${b.label} ${sBadge}</div>
-      <div class="card-meta">${ma} &middot; ${b.interval} &middot; trailing ${tr}%</div>
+      <div class="card-meta">${ma} &middot; ${b.interval} &middot; trailing ${tr}% &middot; coins: ${b.coins.slice(0,5).join(', ')}&hellip;</div>
       <div class="card-eq">$${fmt(p.equity)}</div>
-      <div class="card-pnl ${fPnlCls}">${fp(fStats.pnl)}$ (${fStats.wr.toFixed(1)}% wr &middot; ${fStats.trades} ops)</div>
+      <div class="card-pnl ${pc2}">${fp(p.total_pnl)}$ (${fp(p.total_pnl_pct)}%)</div>
       <div class="card-row">
+        <span>${wr}</span>
         <span>${p.positions.length} pos.</span>
         <span>scan: ${b.last_scan}</span>
         ${b.errors?`<span class="dn">${b.errors} err</span>`:''}
       </div>
-      ${hasMini?`<div class="card-micro"><canvas id="mini-${b.idx}"></canvas></div>`:''}
-      <div class="card-tag">&#x1F4CA; ${coinTag} | ${periodTag}</div>
     </div>`;
   }).join('');
-  // Render mini charts after DOM update
-  requestAnimationFrame(()=>{
-    d.bots.forEach(b=>{
-      const hist = _filteredStats(b.portfolio, _ctrlCoins).hist;
-      if(hist.length >= 2) renderMiniChart(b.idx, hist);
-    });
-  });
-  try{ renderControlCenter(d); }catch(e){ console.error('[CC]',e); }
 
   // Positions
   const allPos=[];
@@ -673,188 +394,6 @@ function render(d){
     }).join('');
 
   document.getElementById('last-upd').textContent='Actualizado: '+d.updated_at;
-}
-
-// ── CONTROL CENTER ────────────────────────────────────────────────────────────
-const CC_CAT_MAP = {
-  'BOT\xB72H\xB7CONS':'Conservador','BOT\xB71H\xB7CONS':'Conservador','BOT\xB74H\xB7CONS':'Conservador',
-  'BOT\xB72H\xB7EQ':'Equilibrado','BOT\xB71H\xB7EQ':'Equilibrado','BOT\xB730M\xB7EQ':'Equilibrado','BOT\xB74H\xB7EQ':'Equilibrado',
-  'BOT\xB715M\xB7HF':'Alta Frecuencia','BOT\xB715M\xB7HF2':'Alta Frecuencia','BOT\xB730M\xB7HF':'Alta Frecuencia'
-};
-function ccCat(label){
-  if(CC_CAT_MAP[label]) return CC_CAT_MAP[label];
-  if(label.startsWith('LIQ\xB7')) return 'Liquidaciones';
-  return 'Legacy';
-}
-function _ddFromHist(hist, initEq){
-  let eq=initEq, peak=initEq, maxDD=0;
-  [...hist].sort((a,b2)=>a.ts-b2.ts).forEach(t=>{
-    eq+=(t.pnl||0);
-    if(eq>peak) peak=eq;
-    const dd=peak>0?(peak-eq)/peak*100:0;
-    if(dd>maxDD) maxDD=dd;
-  });
-  return maxDD;
-}
-function _sharpeFromHist(hist, initEq){
-  const days={};
-  [...hist].sort((a,b2)=>a.ts-b2.ts).forEach(t=>{
-    const d=(t.closed_at||'').slice(0,10);
-    if(d) days[d]=(days[d]||0)+(t.pnl||0);
-  });
-  const rets=Object.values(days).map(v=>v/initEq*100);
-  if(rets.length<2) return 0;
-  const mean=rets.reduce((s,v)=>s+v,0)/rets.length;
-  const std=Math.sqrt(rets.reduce((s,v)=>s+(v-mean)**2,0)/rets.length)||0;
-  return std===0?0:+(mean/std*Math.sqrt(365)).toFixed(2);
-}
-let _ccSortState={col:'score',dir:-1};
-let _ccCatFilter='all';
-let _ccData=[];
-function ccSort(col){
-  if(_ccSortState.col===col) _ccSortState.dir*=-1; else {_ccSortState.col=col;_ccSortState.dir=-1;}
-  document.querySelectorAll('#cc-table th.srt').forEach(th=>{
-    th.classList.remove('asc','desc');
-    if(th.dataset.col===col) th.classList.add(_ccSortState.dir>0?'asc':'desc');
-  });
-  _ccRender();
-}
-function ccFilter(cat,btn){
-  _ccCatFilter=cat;
-  document.querySelectorAll('.cc-cat').forEach(b=>b.classList.remove('active'));
-  if(btn) btn.classList.add('active');
-  _ccRender();
-}
-function _ccRender(){
-  const tb=document.getElementById('cc-tbody');
-  if(!tb) return;
-  let rows=_ccCatFilter==='all'?[..._ccData]:_ccData.filter(r=>r.cat===_ccCatFilter);
-  const {col,dir}=_ccSortState;
-  rows.sort((a,b2)=>{
-    const va=typeof a[col]==='string'?a[col]:+a[col];
-    const vb=typeof b2[col]==='string'?b2[col]:+b2[col];
-    return va<vb?dir:va>vb?-dir:0;
-  });
-  const cnt=document.getElementById('cc-cnt');
-  if(cnt) cnt.textContent=rows.length+' bots';
-  if(!rows.length){
-    tb.innerHTML='<tr><td colspan="11" class="empty">Sin datos \u2014 ejecuta un backtest (3M/6M/1A/M\xC1X) para ver el ranking.</td></tr>';
-    return;
-  }
-  tb.innerHTML=rows.map((r,i)=>{
-    const pCls=r.pnl>=0?'up':'dn', sign=r.pnl>=0?'+':'';
-    const warn=r.pnl<0?'<span style="color:#ff4466;font-size:10px">\u26A0 Revisar</span>':'<span style="color:#00e676;font-size:10px">OK</span>';
-    const wrTxt  = r.wr!==null     ? r.wr.toFixed(1)+'%'    : '<span style="color:#37505f">--</span>';
-    const ddTxt  = r.dd!==null     ? r.dd.toFixed(1)+'%'    : '<span style="color:#37505f">--</span>';
-    const shTxt  = r.sharpe!==null ? (r.sharpe>5?'\u2B50':'')+r.sharpe : '<span style="color:#37505f">--</span>';
-    const ddCls  = r.dd!==null&&r.dd>20?'dn':r.dd!==null&&r.dd>10?'':'nu';
-    const sCls   = r.sharpe!==null&&r.sharpe>=1?'up':r.sharpe!==null&&r.sharpe<0?'dn':'nu';
-    const srcTxt = r.hasBt?'<span style="font-size:9px;color:#37505f">BT</span>':'<span style="font-size:9px;color:#263a4a">live</span>';
-    return `<tr>
-      <td style="color:#37505f">${i+1}</td>
-      <td class="${COLS[r.idx%18]}">${r.label}</td>
-      <td style="font-size:10px;color:#78909c">${r.cat}</td>
-      <td style="font-size:10px">${r.interval}</td>
-      <td class="${pCls}">${sign}${r.pnl.toFixed(2)}</td>
-      <td class="${pCls}">${sign}${r.pnl_pct.toFixed(1)}%</td>
-      <td>${wrTxt}</td>
-      <td class="${ddCls}">${ddTxt}</td>
-      <td class="${sCls}">${shTxt}</td>
-      <td style="font-size:10px;color:#78909c">${srcTxt} ${r.score.toFixed(2)}</td>
-      <td>${warn}</td>
-    </tr>`;
-  }).join('');
-}
-function renderControlCenter(d){
-  if(!d||!d.bots) return;
-  // Build backtest lookup by bot idx (use latest backtest if available)
-  const btMap={};
-  if(_btResults&&_btResults.bots){
-    _btResults.bots.forEach(b=>{ btMap[b.idx]=b; });
-  }
-  _ccData=d.bots.map(b=>{
-    const p=b.portfolio||{};
-    const bt=btMap[b.idx];       // backtest row for this bot (may be undefined)
-    const hasBt=!!bt;
-    // Prefer backtest stats; fall back to live portfolio
-    const pnl    = hasBt ? bt.total_pnl     : (p.total_pnl||0);
-    const pnl_pct= hasBt ? bt.total_pnl_pct : (p.total_pnl_pct||0);
-    const wr     = hasBt ? bt.win_rate       : ((p.trades||0)>0?(p.wins||0)/(p.trades||1)*100:null);
-    const dd     = hasBt ? bt.max_drawdown   : null;
-    const sharpe = hasBt ? bt.sharpe         : null;
-    const trades = hasBt ? bt.total_trades   : (p.trades||0);
-    // Score only meaningful when we have real metrics
-    const score  = (wr!==null&&dd!==null) ? (pnl_pct*(wr/100))/Math.max(dd,1) : pnl_pct;
-    const status = p.positions&&p.positions.length>0 ? 'En posici\xF3n' : (b.status||'OK');
-    return {idx:b.idx,label:b.label||'',cat:ccCat(b.label||''),
-            interval:b.interval||'',pnl,pnl_pct,wr,dd,sharpe,trades,score,hasBt,status};
-  });
-  _ccRender();
-}
-
-// ── CONTROL BAR STATE ─────────────────────────────────────────────────────────
-let _ctrlPeriod = '3m';
-const _ctrlCoins = new Set(['BTC']);
-
-function selectPeriod(p, btn){
-  _ctrlPeriod = p;
-  document.querySelectorAll('#ctrl-bar .ctrl-group:first-child .ctrl-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-}
-
-function toggleCtrlCoin(coin, btn){
-  if(_ctrlCoins.has(coin)){
-    if(_ctrlCoins.size===1) return; // at least 1 required
-    _ctrlCoins.delete(coin);
-    btn.classList.remove('active');
-  } else {
-    _ctrlCoins.add(coin);
-    btn.classList.add('active');
-  }
-}
-
-function applyControl(){
-  // Update tag in ctrl-bar
-  const coinTag = [..._ctrlCoins].join(' \xB7 ');
-  const tEl = document.getElementById('ctrl-tag');
-  if(tEl) tEl.textContent = '\U0001F4CA '+coinTag+' | '+(_ctrlPeriod||'3m').toUpperCase();
-  // Update bt-section header label
-  const hEl = document.getElementById('bt-period-hdr');
-  if(hEl) hEl.textContent = (_ctrlPeriod||'3m').toUpperCase()+' \xB7 '+coinTag;
-  // Run backtest for selected period
-  if(_ctrlPeriod) btLoad(_ctrlPeriod);
-  // Re-render bot cards with new coin filter
-  if(_lastD) render(_lastD);
-}
-
-// ── MICRO CHARTS ──────────────────────────────────────────────────────────────
-const _miniCharts={};
-
-function _filteredStats(portfolio, coinSet){
-  const hist=(portfolio.history||[]).filter(t=>coinSet.has(t.coin));
-  const pnl=hist.reduce((s,t)=>s+(t.pnl||0),0);
-  const wins=hist.filter(t=>(t.pnl||0)>0).length;
-  const wr=hist.length>0?wins/hist.length*100:0;
-  return {pnl,wr,trades:hist.length,wins,hist};
-}
-
-function renderMiniChart(idx,hist){
-  const cv=document.getElementById('mini-'+idx);
-  if(!cv) return;
-  if(_miniCharts[idx]){_miniCharts[idx].destroy();delete _miniCharts[idx];}
-  if(!hist||hist.length<2) return;
-  const sorted=[...hist].sort((a,b2)=>a.ts-b2.ts);
-  let eq=10000;
-  const pts=sorted.map(t=>{eq+=(t.pnl||0);return eq;});
-  const color=pts[pts.length-1]>=pts[0]?'#00e676':'#ff4466';
-  _miniCharts[idx]=new Chart(cv,{
-    type:'line',
-    data:{labels:pts.map((_,i)=>i),datasets:[{data:pts,borderColor:color,borderWidth:1.2,
-      fill:false,pointRadius:0,tension:0.2}]},
-    options:{responsive:true,maintainAspectRatio:false,animation:{duration:0},
-      plugins:{legend:{display:false},tooltip:{enabled:false}},
-      scales:{x:{display:false},y:{display:false}}}
-  });
 }
 
 function startCD(){
@@ -936,22 +475,12 @@ if(typeof Chart !== 'undefined'){
   Chart.register(priceLinePlugin);
 }
 
-function _hmapNodata(coin, msg){
-  const wrap = document.getElementById('hchart-'+coin)?.parentElement;
-  if(!wrap) return;
-  let nd = wrap.querySelector('.hmap-nodata');
-  if(!nd){ nd = document.createElement('div'); nd.className='hmap-nodata'; wrap.appendChild(nd); }
-  nd.textContent = msg || '';
-  nd.style.display = msg ? 'flex' : 'none';
-}
-
 function renderHeatmapChart(coin, data){
   const canvas = document.getElementById('hchart-'+coin);
   if(!canvas) return;
   const zones = data.zones || [];
   const price = data.price || 0;
-  if(!zones.length){ _hmapNodata(coin, 'Sin datos de liquidaciones'); return; }
-  _hmapNodata(coin, '');
+  if(!zones.length) return;
 
   // Sort ascending by price (Chart.js indexAxis:y renders bottom→top by default, we reverse)
   const sorted = [...zones].sort((a,b)=>a.price-b.price);
@@ -1053,7 +582,7 @@ function renderOI(rows){
 function renderMarket(d){
   if(d.oi_table) renderOI(d.oi_table);
   if(d.liq){
-    for(const coin of ['BTC','ETH','SOL','AVAX','DOGE','ARB','OP','WIF','SUI']){
+    for(const coin of ['BTC','ETH','SOL']){
       if(d.liq[coin]) renderHeatmapChart(coin, d.liq[coin]);
     }
   }
@@ -1078,160 +607,18 @@ function fetchMarket(){
     .catch(()=>startMktCD());
 }
 
-// ── FILTER BAR ───────────────────────────────────────────────────────────────
-let _curFilter = 'all';
-function applyFilter(f, btn){
-  _curFilter = f;
-  document.querySelectorAll('.flt-btn').forEach(b=>b.classList.remove('active'));
-  if(btn) btn.classList.add('active');
-  document.querySelectorAll('#bot-cards .card').forEach(card=>{
-    let show = true;
-    if(f==='win')  show = card.dataset.pnlPos === '1';
-    else if(f==='lose') show = card.dataset.pnlPos === '0';
-    else if(['15m','30m','1h','4h'].includes(f)) show = card.dataset.interval === f;
-    else if(f==='liq') show = card.dataset.type === 'liq';
-    card.style.display = show ? '' : 'none';
-  });
-}
-
-// ── TRADINGVIEW MODAL ─────────────────────────────────────────────────────────
-const TV_IV = {'15m':'15','30m':'30','1h':'60','4h':'240'};
-let _tvReady = false;
-function _loadTVScript(cb){
-  if(_tvReady){cb();return;}
-  if(document.querySelector('script[src*="tv.js"]')){
-    const wait=setInterval(()=>{if(window.TradingView){_tvReady=true;clearInterval(wait);cb();}},100);
-    return;
-  }
-  const s=document.createElement('script');
-  s.src='https://s3.tradingview.com/tv.js';
-  s.onload=()=>{_tvReady=true;cb();};
-  document.head.appendChild(s);
-}
-function openTVModal(coin, interval, label){
-  const sym  = 'BINANCE:'+coin+'USDT';
-  const iv   = TV_IV[interval] || '60';
-  document.getElementById('tv-modal-title').textContent = label + ' — ' + coin + 'USDT · ' + interval;
-  document.getElementById('tv-overlay').classList.add('open');
-  document.body.style.overflow = 'hidden';
-  const cont = document.getElementById('tv-container');
-  cont.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#37505f;font-size:12px">Cargando TradingView&hellip;</div>';
-  _loadTVScript(()=>{
-    cont.innerHTML = '';
-    new TradingView.widget({
-      autosize: true,
-      symbol: sym,
-      interval: iv,
-      timezone: 'Etc/UTC',
-      theme: 'dark',
-      style: '1',
-      locale: 'en',
-      toolbar_bg: '#0b0f1c',
-      enable_publishing: false,
-      hide_side_toolbar: false,
-      allow_symbol_change: true,
-      container_id: 'tv-container',
-    });
-  });
-}
-function closeTVModal(){
-  document.getElementById('tv-overlay').classList.remove('open');
-  document.body.style.overflow = '';
-  document.getElementById('tv-container').innerHTML = '';
-}
-document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeTVModal(); });
-
-// ── FEAR & GREED INDEX ────────────────────────────────────────────────────────
-const FNG_COLORS = [[0,'#ff1744'],[25,'#ff6d00'],[50,'#ffd740'],[55,'#69f0ae'],[75,'#00e676']];
-const FNG_CLASSES = {
-  'Extreme Fear':'fng-ef','Fear':'fng-f','Neutral':'fng-n',
-  'Greed':'fng-g','Extreme Greed':'fng-eg'
-};
-function _fngArcPath(cx,cy,r,startDeg,endDeg){
-  const toR=d=>d*Math.PI/180;
-  const x1=cx+r*Math.cos(toR(startDeg));
-  const y1=cy+r*Math.sin(toR(startDeg));
-  const x2=cx+r*Math.cos(toR(endDeg));
-  const y2=cy+r*Math.sin(toR(endDeg));
-  const large=Math.abs(endDeg-startDeg)>180?1:0;
-  return `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2}`;
-}
-function renderFNG(val, label, ts){
-  // Draw gauge arcs: 180° semicircle, 0=left, 100=right
-  // Zones: 0-25 red, 25-50 orange, 50-55 yellow, 55-75 light green, 75-100 green
-  const zones=[
-    [0,25,'#ff1744'],[25,50,'#ff6d00'],[50,55,'#ffd740'],
-    [55,75,'#69f0ae'],[75,100,'#00e676']
-  ];
-  const arcsG = document.getElementById('fng-arcs');
-  if(!arcsG) return;
-  arcsG.innerHTML = '';
-  // Map value 0-100 → angle 180-360 (semicircle, left to right)
-  const toAngle = v => 180 + v * 1.8;  // 0→180°, 100→360°
-  zones.forEach(([s,e,color])=>{
-    const p = document.createElementNS('http://www.w3.org/2000/svg','path');
-    p.setAttribute('d', _fngArcPath(80,80,62, toAngle(s), toAngle(e)));
-    p.setAttribute('stroke', color);
-    p.setAttribute('stroke-width', '10');
-    p.setAttribute('fill', 'none');
-    p.setAttribute('stroke-opacity','0.9');
-    arcsG.appendChild(p);
-  });
-  // Needle angle
-  const ang = toAngle(val) * Math.PI / 180;
-  const nx  = 80 + 56 * Math.cos(ang);
-  const ny  = 80 + 56 * Math.sin(ang);
-  const needle = document.getElementById('fng-needle');
-  if(needle){ needle.setAttribute('x2', nx.toFixed(1)); needle.setAttribute('y2', ny.toFixed(1)); }
-  const numSvg = document.getElementById('fng-num-svg');
-  if(numSvg){ numSvg.textContent = val; }
-
-  // Text info
-  const cls = FNG_CLASSES[label] || 'nu';
-  const vEl = document.getElementById('fng-val');
-  const lEl = document.getElementById('fng-lbl');
-  if(vEl){ vEl.textContent = val; vEl.className = 'fng-val '+cls; }
-  if(lEl){ lEl.textContent = label; lEl.className = 'fng-lbl '+cls; }
-  const tsEl = document.getElementById('fng-ts');
-  if(tsEl) tsEl.textContent = ts ? 'Actualizado: '+new Date(ts*1000).toLocaleString('es') : '';
-}
-function fetchFNG(){
-  fetch('https://api.alternative.me/fng/?limit=1&format=json')
-    .then(r=>r.json())
-    .then(d=>{
-      const rec   = d.data && d.data[0];
-      if(!rec) return;
-      const val   = parseInt(rec.value, 10);
-      const label = rec.value_classification || '';
-      const ts    = parseInt(rec.timestamp, 10);
-      renderFNG(val, label, ts);
-    })
-    .catch(()=>{
-      const lEl = document.getElementById('fng-lbl');
-      if(lEl) lEl.textContent = 'Sin datos';
-    });
-}
-
-for(const _c of ['BTC','ETH','SOL','AVAX','DOGE','ARB','OP','WIF','SUI']) _hmapNodata(_c,'Cargando datos\u2026');
 fetchData();
 fetchMarket();
-fetchFNG();
-setInterval(fetchFNG, 600_000); // actualiza cada 10 min
 
 // ── BACKTEST ──────────────────────────────────────────────────────────────────
 let _btPeriod = null, _btPoll = null;
 const _eqCharts = {};
 let _btBarChart = null;
-let _btResults = null; // latest backtest results (used by Control Center)
-let _btCoins   = '';   // coins param used in last backtest run
 const BT_PERIOD_LBL = {'3m':'3 Meses','6m':'6 Meses','1y':'1 Año','max':'Máximo'};
 
 function btLoad(period){
-  const coinsParam = [..._ctrlCoins].sort().join(',');
-  // Use period+coins as cache key so changing coins always triggers a fresh run
-  if(_btPeriod === period && _btCoins === coinsParam) return;
+  if(_btPeriod === period) return;
   _btPeriod = period;
-  _btCoins  = coinsParam;
   document.querySelectorAll('.bt-tab').forEach((b,i)=>{
     b.classList.toggle('active', ['3m','6m','1y','max'][i]===period);
   });
@@ -1240,15 +627,15 @@ function btLoad(period){
   resEl.style.display = 'none';
   progEl.style.display = 'block';
   document.getElementById('bt-pbar').style.width = '0%';
-  document.getElementById('bt-status').textContent = 'Iniciando backtest en segundo plano\u2026';
-  fetch('/api/backtest/start?period='+period+'&coins='+coinsParam).catch(()=>{});
+  document.getElementById('bt-status').textContent = 'Iniciando backtest en segundo plano…';
+  fetch('/api/backtest/start?period='+period).catch(()=>{});
   clearInterval(_btPoll);
   _btPoll = setInterval(btPollOnce, 2500);
 }
 
 function btPollOnce(){
   if(!_btPeriod) return;
-  fetch('/api/backtest?period='+_btPeriod+'&coins='+(_btCoins||''))
+  fetch('/api/backtest?period='+_btPeriod)
     .then(r=>r.json())
     .then(d=>{
       const pct = d.progress ?? 0;
@@ -1269,7 +656,6 @@ function btPollOnce(){
 
 function btShowResults(data){
   if(!data||!data.bots) return;
-  _btResults = data; // store for Control Center
   document.getElementById('bt-results').style.display = 'block';
   const lbl = BT_PERIOD_LBL[data.period] || data.period;
   document.getElementById('bt-period-lbl').textContent = lbl + ' · ' + data.computed_at;
@@ -1277,8 +663,6 @@ function btShowResults(data){
   btRenderBar(data.bots);
   btRenderTable(data.bots);
   document.getElementById('bt-computed-at').textContent = 'Calculado: ' + data.computed_at + ' · Capital inicial $10,000 por bot';
-  // Refresh Control Center with backtest data
-  if(_lastD) try{ renderControlCenter(_lastD); }catch(e){}
 }
 
 function btRenderEquity(bots){
@@ -1385,16 +769,6 @@ function btRenderTable(bots){
 class DashHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
-        try:
-            self._do_GET_inner()
-        except Exception as exc:
-            log.exception("do_GET unhandled error: %s", exc)
-            try:
-                self._respond(500, "text/plain", b"Internal Server Error")
-            except Exception:
-                pass
-
-    def _do_GET_inner(self):
         path = self.path.split("?")[0]
 
         if path == "/health":
@@ -1420,13 +794,9 @@ class DashHandler(BaseHTTPRequestHandler):
             period = "3m"
             if "period=" in self.path:
                 period = self.path.split("period=")[-1].split("&")[0].strip()
-            coins = ""
-            if "coins=" in self.path:
-                raw = self.path.split("coins=")[-1].split("&")[0].strip()
-                coins = ",".join(c.strip() for c in raw.split(",") if c.strip().isalnum())
             data = {
-                "progress": backtest_engine.get_progress(period, coins),
-                "result":   backtest_engine.get_result(period, coins),
+                "progress": backtest_engine.get_progress(period),
+                "result":   backtest_engine.get_result(period),
             }
             self._respond(200, "application/json", json.dumps(data).encode())
 
@@ -1436,16 +806,11 @@ class DashHandler(BaseHTTPRequestHandler):
                 period = self.path.split("period=")[-1].split("&")[0].strip()
             if period not in ("3m", "6m", "1y", "max"):
                 period = "3m"
-            coins = ""
-            if "coins=" in self.path:
-                raw = self.path.split("coins=")[-1].split("&")[0].strip()
-                coins = ",".join(c.strip() for c in raw.split(",") if c.strip().isalnum())
-            backtest_engine.run_backtest_bg(period, coins)
+            backtest_engine.run_backtest_bg(period)
             self._respond(200, "application/json", b'{"ok":true}')
 
         elif path in ("/", "/index.html"):
-            _html = DASHBOARD_HTML.encode("utf-8", errors="ignore").decode("utf-8")
-            self._respond(200, "text/html; charset=utf-8", _html.encode("utf-8", errors="replace"))
+            self._respond(200, "text/html; charset=utf-8", DASHBOARD_HTML.encode("utf-8"))
 
         else:
             self._respond(404, "text/plain", b"Not Found")
