@@ -302,7 +302,7 @@ def _ema(arr: np.ndarray, n: int) -> np.ndarray:
         return np.full_like(arr, np.nan)
     out = np.empty_like(arr)
     out[:n-1] = np.nan
-    out[n-1]  = float(np.nanmean(arr[:n]))
+    out[n-1]  = _safe_nanmean(arr[:n])
     k = 2.0 / (n + 1); k1 = 1.0 - k
     prev = out[n-1]
     for i in range(n, len(arr)):
@@ -327,7 +327,9 @@ def _rsi(closes: np.ndarray, n: int = 14) -> np.ndarray:
     if len(closes) < n + 1: return out
     d = np.diff(closes)
     gains = np.maximum(d, 0.0); losses = np.maximum(-d, 0.0)
-    ag = float(np.mean(gains[:n])); al = float(np.mean(losses[:n]))
+    ag = _safe_nanmean(gains[:n]); al = _safe_nanmean(losses[:n])
+    if np.isnan(ag): ag = 0.0
+    if np.isnan(al): al = 0.0
     for i in range(n, len(d)):
         ag = (ag*(n-1) + gains[i]) / n
         al = (al*(n-1) + losses[i]) / n
@@ -341,7 +343,7 @@ def _atr(high: np.ndarray, low: np.ndarray, close: np.ndarray, n: int = 14) -> n
     if len(close) < n + 1: return out
     tr = np.maximum(high[1:]-low[1:],
          np.maximum(np.abs(high[1:]-close[:-1]), np.abs(low[1:]-close[:-1])))
-    out[n] = float(np.mean(tr[:n]))
+    out[n] = _safe_nanmean(tr[:n])
     for i in range(n, len(tr)):
         out[i+1] = (out[i]*(n-1) + tr[i]) / n
     return out
@@ -423,7 +425,7 @@ def _adx(high: np.ndarray, low: np.ndarray, close: np.ndarray, n: int = 14) -> n
     adx_arr = np.full(N, np.nan)
     first = n * 2 - 2
     if first < N:
-        adx_arr[first] = float(np.mean(dx[n-1:n*2-1]))
+        adx_arr[first] = _safe_nanmean(dx[n-1:n*2-1])
         for i in range(first + 1, N):
             adx_arr[i] = (adx_arr[i-1]*(n-1) + dx[i]) / n
     # adx_arr[i] corresponds to close[i+1] — shift by 1 to align
@@ -478,7 +480,7 @@ def _cci(high: np.ndarray, low: np.ndarray, close: np.ndarray, n: int = 20) -> n
     tp_sma = _sma(tp, n)
     out = np.full_like(close, np.nan)
     for i in range(n-1, len(close)):
-        mean_dev = float(np.mean(np.abs(tp[i-n+1:i+1] - tp_sma[i])))
+        mean_dev = _safe_nanmean(np.abs(tp[i-n+1:i+1] - tp_sma[i]))
         if mean_dev > 0:
             out[i] = (tp[i] - tp_sma[i]) / (0.015 * mean_dev)
     return out
@@ -543,8 +545,10 @@ def _market_structure(high: np.ndarray, low: np.ndarray, n: int = 10) -> np.ndar
     struct = np.zeros(len(high))
     for i in range(n, len(high)):
         ph = high[i-n:i]; pl = low[i-n:i]
-        is_hh = high[i] > np.max(ph); is_hl = low[i] > np.min(pl)
-        is_lh = high[i] < np.max(ph); is_ll = low[i] < np.min(pl)
+        ph_max = _safe_nanmax(ph); pl_min = _safe_nanmin(pl)
+        if np.isnan(ph_max) or np.isnan(pl_min): continue
+        is_hh = high[i] > ph_max; is_hl = low[i] > pl_min
+        is_lh = high[i] < ph_max; is_ll = low[i] < pl_min
         if is_hh and is_hl:   struct[i] = 1
         elif is_lh and is_ll: struct[i] = -1
     return struct
@@ -618,6 +622,22 @@ _ASIA      = set(range(0, 9))
 _NY        = set(range(13, 22))
 _LDN_NY_OV = set(range(13, 18))
 
+# ─── SAFE AGGREGATION HELPERS ─────────────────────────────────────────────────
+def _safe_nanmin(arr: np.ndarray) -> float:
+    if len(arr) == 0: return np.nan
+    valid = arr[~np.isnan(arr)]
+    return float(np.min(valid)) if len(valid) > 0 else np.nan
+
+def _safe_nanmax(arr: np.ndarray) -> float:
+    if len(arr) == 0: return np.nan
+    valid = arr[~np.isnan(arr)]
+    return float(np.max(valid)) if len(valid) > 0 else np.nan
+
+def _safe_nanmean(arr: np.ndarray) -> float:
+    if len(arr) == 0: return np.nan
+    valid = arr[~np.isnan(arr)]
+    return float(np.mean(valid)) if len(valid) > 0 else np.nan
+
 _FIBO_L = np.array([0.236, 0.382, 0.500, 0.618, 0.786])
 
 
@@ -684,8 +704,10 @@ def _worker_init(cache_pkl: str):
             macd_bear_div = np.zeros(len(closes), dtype=bool)
             for i in range(lb*2, len(closes)):
                 if macd_h[i] != macd_h[i]: continue
-                lo_c = np.nanmin(closes[i-lb:i]); lo_mh = np.nanmin(macd_h[i-lb:i])
-                hi_c = np.nanmax(closes[i-lb:i]); hi_mh = np.nanmax(macd_h[i-lb:i])
+                sl_c = closes[i-lb:i]; sl_mh = macd_h[i-lb:i]
+                lo_c  = _safe_nanmin(sl_c);  hi_c  = _safe_nanmax(sl_c)
+                lo_mh = _safe_nanmin(sl_mh); hi_mh = _safe_nanmax(sl_mh)
+                if np.isnan(lo_c) or np.isnan(hi_c) or np.isnan(lo_mh) or np.isnan(hi_mh): continue
                 if closes[i] <= lo_c and macd_h[i] > lo_mh: macd_bull_div[i] = True
                 if closes[i] >= hi_c and macd_h[i] < hi_mh: macd_bear_div[i] = True
 
@@ -711,8 +733,10 @@ def _worker_init(cache_pkl: str):
             obv_bull_div = np.zeros(len(closes), dtype=bool)
             obv_bear_div = np.zeros(len(closes), dtype=bool)
             for i in range(lb*2, len(closes)):
-                lo_c = np.nanmin(closes[i-lb:i]); lo_o = np.nanmin(obv_arr[i-lb:i])
-                hi_c = np.nanmax(closes[i-lb:i]); hi_o = np.nanmax(obv_arr[i-lb:i])
+                sl_c = closes[i-lb:i]; sl_o = obv_arr[i-lb:i]
+                lo_c = _safe_nanmin(sl_c);  hi_c = _safe_nanmax(sl_c)
+                lo_o = _safe_nanmin(sl_o);  hi_o = _safe_nanmax(sl_o)
+                if np.isnan(lo_c) or np.isnan(hi_c) or np.isnan(lo_o) or np.isnan(hi_o): continue
                 if closes[i] <= lo_c and obv_arr[i] > lo_o: obv_bull_div[i] = True
                 if closes[i] >= hi_c and obv_arr[i] < hi_o: obv_bear_div[i] = True
 
@@ -925,16 +949,17 @@ def _simulate_fast(params: OptParams, coins_ind: Dict[str, dict]) -> dict:
                 elif trail_type == "chandelier":
                     w = 22
                     if i >= w:
+                        av = atr14[i] if atr14[i] == atr14[i] else entry * 0.01
                         if direction == "long":
-                            peak = float(np.max(highs[i-w:i+1]))
-                            av = atr14[i] if atr14[i] == atr14[i] else entry * 0.01
-                            ns = peak - 3.0 * av
-                            if ns > stop: stop = ns
+                            peak = _safe_nanmax(highs[i-w:i+1])
+                            if not np.isnan(peak):
+                                ns = peak - 3.0 * av
+                                if ns > stop: stop = ns
                         else:
-                            trough = float(np.min(lows[i-w:i+1]))
-                            av = atr14[i] if atr14[i] == atr14[i] else entry * 0.01
-                            ns = trough + 3.0 * av
-                            if ns < stop: stop = ns
+                            trough = _safe_nanmin(lows[i-w:i+1])
+                            if not np.isnan(trough):
+                                ns = trough + 3.0 * av
+                                if ns < stop: stop = ns
                     position = (direction, entry, stop, tp)
                 elif sl_type == "trailing":
                     if direction == "long":
@@ -1357,9 +1382,11 @@ def _simulate_fast(params: OptParams, coins_ind: Dict[str, dict]) -> dict:
                 if i >= w:
                     av_c = av_now
                     if signal == "long":
-                        stop = float(np.max(highs[i-w:i+1])) - 3.0 * av_c
+                        peak = _safe_nanmax(highs[i-w:i+1])
+                        stop = (peak - 3.0 * av_c) if not np.isnan(peak) else entry * (1.0 - trailing * 2)
                     else:
-                        stop = float(np.min(lows[i-w:i+1]))  + 3.0 * av_c
+                        trough = _safe_nanmin(lows[i-w:i+1])
+                        stop = (trough + 3.0 * av_c) if not np.isnan(trough) else entry * (1.0 + trailing * 2)
 
             tp = None
             if tp_fib:
