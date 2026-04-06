@@ -136,6 +136,13 @@ tr:hover td{background:#0d1420}
 .flt-btn{padding:4px 12px;border:1px solid #1e3a4a;border-radius:3px;font-size:11px;font-weight:bold;cursor:pointer;background:#0a0f1c;color:#546e7a;transition:all .2s;letter-spacing:.5px;font-family:inherit}
 .flt-btn.active{background:#0d2030;border-color:#4fc3f7;color:#4fc3f7}
 .flt-btn:hover{border-color:#37505f;color:#c9d4e0}
+.group-header{grid-column:1/-1;padding:8px 4px 4px;font-size:11px;font-weight:bold;letter-spacing:1.5px;color:#4fc3f7;border-bottom:1px solid #1e3a4a;margin-bottom:4px;margin-top:8px}
+.group-header .group-cnt{font-weight:normal;color:#546e7a;margin-left:8px}
+#bot-cards{display:flex;flex-direction:column;gap:0}
+.group-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:6px}
+@media(max-width:1200px){.group-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:900px){.group-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:580px){.group-grid{grid-template-columns:1fr}}
 
 /* ── TRADINGVIEW MODAL ── */
 .tv-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:1000;align-items:center;justify-content:center}
@@ -449,6 +456,11 @@ th.srt.desc::after{content:' \25BC'}
     <button class="flt-btn active" onclick="applyFilter('all',this)">Todos</button>
     <button class="flt-btn" onclick="applyFilter('win',this)">&#x2B; Ganadores</button>
     <button class="flt-btn" onclick="applyFilter('lose',this)">&#x2212; Perdedores</button>
+    <button class="flt-btn" onclick="applyFilter('btc',this)">BTC</button>
+    <button class="flt-btn" onclick="applyFilter('eth',this)">ETH</button>
+    <button class="flt-btn" onclick="applyFilter('long',this)">LONG</button>
+    <button class="flt-btn" onclick="applyFilter('short',this)">SHORT</button>
+    <button class="flt-btn" onclick="applyFilter('ls',this)">L+S</button>
     <button class="flt-btn" onclick="applyFilter('15m',this)">15m</button>
     <button class="flt-btn" onclick="applyFilter('30m',this)">30m</button>
     <button class="flt-btn" onclick="applyFilter('1h',this)">1h</button>
@@ -456,10 +468,8 @@ th.srt.desc::after{content:' \25BC'}
     <button class="flt-btn" onclick="applyFilter('liq',this)">Liquidaciones</button>
   </div>
 
-  <div class="grid3" id="bot-cards">
+  <div id="bot-cards">
     <div class="card c0"><div class="card-name col0">BOT&middot;4H</div><div class="card-meta">Cargando&hellip;</div></div>
-    <div class="card c1"><div class="card-name col1">BOT&middot;1H&middot;EMA</div><div class="card-meta">Cargando&hellip;</div></div>
-    <div class="card c2"><div class="card-name col2">BOT&middot;1H&middot;SMA</div><div class="card-meta">Cargando&hellip;</div></div>
   </div>
 
   <div class="panel">
@@ -567,7 +577,25 @@ function render(d){
   // ── Bot cards ─────────────────────────────────────────────────────────────
   const coinTag = [..._ctrlCoins].join(' \xB7 ');
   const periodTag = _ctrlPeriod ? _ctrlPeriod.toUpperCase() : '3M';
-  document.getElementById('bot-cards').innerHTML=d.bots.map((b,i)=>{
+
+  // Group definitions: label → idx range (inclusive)
+  const BOT_GROUPS = [
+    { key:'legacy',   label:'LEGACY',        from:0,  to:35,  icon:'\u{1F4BC}' },
+    { key:'btc-long', label:'BTC LONG',       from:36, to:39,  icon:'\u{1F7E2}' },
+    { key:'btc-short',label:'BTC SHORT',      from:40, to:43,  icon:'\u{1F534}' },
+    { key:'btc-ls',   label:'BTC LONG+SHORT', from:44, to:45,  icon:'\u{1F7E1}' },
+    { key:'eth-long', label:'ETH LONG',       from:46, to:49,  icon:'\u{1F7E2}' },
+    { key:'eth-short',label:'ETH SHORT',      from:50, to:52,  icon:'\u{1F534}' },
+    { key:'eth-ls',   label:'ETH LONG+SHORT', from:53, to:56,  icon:'\u{1F7E1}' },
+    { key:'liq',      label:'LIQUIDACIONES',  from:200,to:999, icon:'\u{26A1}' },
+  ];
+
+  function _botGroup(idx){
+    for(const g of BOT_GROUPS) if(idx>=g.from && idx<=g.to) return g.key;
+    return 'legacy';
+  }
+
+  function _cardHtml(b){
     const p=b.portfolio, cc=COLS[b.idx%18], cv=CARDS[b.idx%18];
     const ma=b.ma_type==='liq'?'LIQ\xB7'+(b.strategy||'').toUpperCase()
              :(b.ma_type==='ema'?'EMA':'SMA')+' '+b.ma_fast+'/'+b.ma_slow;
@@ -577,10 +605,13 @@ function render(d){
       :'<span class="b b-wait">'+b.status+'</span>';
     const bType = b.ma_type==='liq'?'liq':'ema';
     const firstCoin = (b.coins&&b.coins[0])||'BTC';
+    const bDir = b.direction||'both';
+    const bCoin = firstCoin.toLowerCase();
     const fStats = _filteredStats(p, _ctrlCoins);
     const fPnlCls = pc(fStats.pnl);
     const hasMini = fStats.hist.length >= 2;
-    return `<div class="card ${cv}" data-interval="${b.interval}" data-pnl-pos="${p.total_pnl>=0?1:0}" data-type="${bType}"
+    const grp = _botGroup(b.idx);
+    return `<div class="card ${cv}" data-interval="${b.interval}" data-pnl-pos="${p.total_pnl>=0?1:0}" data-type="${bType}" data-dir="${bDir}" data-coin="${bCoin}" data-group="${grp}"
       onclick="openTVModal('${firstCoin}','${b.interval}','${b.label}')">
       <div class="card-name ${cc}">${b.label} ${sBadge}</div>
       <div class="card-meta">${ma} &middot; ${b.interval} &middot; trailing ${tr}%</div>
@@ -594,7 +625,19 @@ function render(d){
       ${hasMini?`<div class="card-micro"><canvas id="mini-${b.idx}"></canvas></div>`:''}
       <div class="card-tag">&#x1F4CA; ${coinTag} | ${periodTag}</div>
     </div>`;
-  }).join('');
+  }
+
+  // Build grouped HTML
+  let cardsHtml = '';
+  for(const g of BOT_GROUPS){
+    const groupBots = d.bots.filter(b=>b.idx>=g.from && b.idx<=g.to);
+    if(!groupBots.length) continue;
+    cardsHtml += `<div class="group-header" data-group="${g.key}">${g.icon} ${g.label} <span class="group-cnt">${groupBots.length} bots</span></div>`;
+    cardsHtml += `<div class="grid3 group-grid" data-group="${g.key}">`;
+    cardsHtml += groupBots.map(_cardHtml).join('');
+    cardsHtml += '</div>';
+  }
+  document.getElementById('bot-cards').innerHTML = cardsHtml;
   // Render mini charts after DOM update
   requestAnimationFrame(()=>{
     d.bots.forEach(b=>{
@@ -1086,11 +1129,23 @@ function applyFilter(f, btn){
   if(btn) btn.classList.add('active');
   document.querySelectorAll('#bot-cards .card').forEach(card=>{
     let show = true;
-    if(f==='win')  show = card.dataset.pnlPos === '1';
-    else if(f==='lose') show = card.dataset.pnlPos === '0';
-    else if(['15m','30m','1h','4h'].includes(f)) show = card.dataset.interval === f;
-    else if(f==='liq') show = card.dataset.type === 'liq';
+    if(f==='win')   show = card.dataset.pnlPos === '1';
+    else if(f==='lose')  show = card.dataset.pnlPos === '0';
+    else if(f==='btc')   show = card.dataset.coin === 'btc';
+    else if(f==='eth')   show = card.dataset.coin === 'eth';
+    else if(f==='long')  show = card.dataset.dir === 'long';
+    else if(f==='short') show = card.dataset.dir === 'short';
+    else if(f==='ls')    show = card.dataset.dir === 'both';
+    else if(['15m','30m','1h','2h','4h'].includes(f)) show = card.dataset.interval === f;
+    else if(f==='liq')   show = card.dataset.type === 'liq';
     card.style.display = show ? '' : 'none';
+  });
+  // Show/hide group headers based on visible cards
+  document.querySelectorAll('#bot-cards .group-grid').forEach(grid=>{
+    const anyVisible = [...grid.querySelectorAll('.card')].some(c=>c.style.display!=='none');
+    const hdr = document.querySelector(`.group-header[data-group="${grid.dataset.group}"]`);
+    if(hdr) hdr.style.display = anyVisible ? '' : 'none';
+    grid.style.display = anyVisible ? '' : 'none';
   });
 }
 

@@ -258,6 +258,11 @@ def _bt_crossover(cfg, candles_cache: dict, days: int) -> dict:
             if not in_pos:
                 up   = fp <= sp and fc > sc
                 down = fp >= sp and fc < sc
+                direction = getattr(cfg, "direction", "both")
+                if direction == "long":
+                    up = up; down = False
+                elif direction == "short":
+                    up = False; down = down
                 if up or down:
                     in_pos = True
                     dir_   = "long" if up else "short"
