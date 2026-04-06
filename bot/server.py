@@ -423,11 +423,14 @@ th.srt.desc::after{content:' \25BC'}
     <div class="cc-flt">
       <span class="flt-lbl">Categor&iacute;a:</span>
       <button class="cc-cat active" onclick="ccFilter('all',this)">Todos</button>
-      <button class="cc-cat" onclick="ccFilter('Conservador',this)">Conservador</button>
-      <button class="cc-cat" onclick="ccFilter('Equilibrado',this)">Equilibrado</button>
-      <button class="cc-cat" onclick="ccFilter('Alta Frecuencia',this)">Alta Frecuencia</button>
-      <button class="cc-cat" onclick="ccFilter('Liquidaciones',this)">Liquidaciones</button>
       <button class="cc-cat" onclick="ccFilter('Legacy',this)">Legacy</button>
+      <button class="cc-cat" onclick="ccFilter('BTC LONG',this)">BTC LONG</button>
+      <button class="cc-cat" onclick="ccFilter('BTC SHORT',this)">BTC SHORT</button>
+      <button class="cc-cat" onclick="ccFilter('BTC L+S',this)">BTC L+S</button>
+      <button class="cc-cat" onclick="ccFilter('ETH LONG',this)">ETH LONG</button>
+      <button class="cc-cat" onclick="ccFilter('ETH SHORT',this)">ETH SHORT</button>
+      <button class="cc-cat" onclick="ccFilter('ETH L+S',this)">ETH L+S</button>
+      <button class="cc-cat" onclick="ccFilter('Liquidaciones',this)">Liquidaciones</button>
     </div>
     <div class="tbl-wrap" style="padding:0 14px 10px">
       <table id="cc-table">
@@ -719,14 +722,14 @@ function render(d){
 }
 
 // ── CONTROL CENTER ────────────────────────────────────────────────────────────
-const CC_CAT_MAP = {
-  'BOT\xB72H\xB7CONS':'Conservador','BOT\xB71H\xB7CONS':'Conservador','BOT\xB74H\xB7CONS':'Conservador',
-  'BOT\xB72H\xB7EQ':'Equilibrado','BOT\xB71H\xB7EQ':'Equilibrado','BOT\xB730M\xB7EQ':'Equilibrado','BOT\xB74H\xB7EQ':'Equilibrado',
-  'BOT\xB715M\xB7HF':'Alta Frecuencia','BOT\xB715M\xB7HF2':'Alta Frecuencia','BOT\xB730M\xB7HF':'Alta Frecuencia'
-};
-function ccCat(label){
-  if(CC_CAT_MAP[label]) return CC_CAT_MAP[label];
+function ccCat(label, idx){
   if(label.startsWith('LIQ\xB7')) return 'Liquidaciones';
+  if(idx>=36&&idx<=39) return 'BTC LONG';
+  if(idx>=40&&idx<=43) return 'BTC SHORT';
+  if(idx>=44&&idx<=45) return 'BTC L+S';
+  if(idx>=46&&idx<=49) return 'ETH LONG';
+  if(idx>=50&&idx<=52) return 'ETH SHORT';
+  if(idx>=53&&idx<=56) return 'ETH L+S';
   return 'Legacy';
 }
 function _ddFromHist(hist, initEq){
@@ -829,7 +832,7 @@ function renderControlCenter(d){
     // Score only meaningful when we have real metrics
     const score  = (wr!==null&&dd!==null) ? (pnl_pct*(wr/100))/Math.max(dd,1) : pnl_pct;
     const status = p.positions&&p.positions.length>0 ? 'En posici\xF3n' : (b.status||'OK');
-    return {idx:b.idx,label:b.label||'',cat:ccCat(b.label||''),
+    return {idx:b.idx,label:b.label||'',cat:ccCat(b.label||'',b.idx),
             interval:b.interval||'',pnl,pnl_pct,wr,dd,sharpe,trades,score,hasBt,status};
   });
   _ccRender();
@@ -1507,6 +1510,11 @@ class DashHandler(BaseHTTPRequestHandler):
 
 # ─── MAIN ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+    # Clear backtest cache on every startup so results always reflect current data
+    backtest_engine._cache.clear()
+    backtest_engine._progress.clear()
+    backtest_engine._running.clear()
+
     sim_engine.start()
 
     port   = int(os.environ.get("PORT", 10000))
