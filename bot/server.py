@@ -580,14 +580,14 @@ function render(d){
 
   // Group definitions: label → idx range (inclusive)
   const BOT_GROUPS = [
-    { key:'legacy',   label:'LEGACY',        from:0,  to:35,  icon:'\u{1F4BC}' },
-    { key:'btc-long', label:'BTC LONG',       from:36, to:39,  icon:'\u{1F7E2}' },
-    { key:'btc-short',label:'BTC SHORT',      from:40, to:43,  icon:'\u{1F534}' },
-    { key:'btc-ls',   label:'BTC LONG+SHORT', from:44, to:45,  icon:'\u{1F7E1}' },
-    { key:'eth-long', label:'ETH LONG',       from:46, to:49,  icon:'\u{1F7E2}' },
-    { key:'eth-short',label:'ETH SHORT',      from:50, to:52,  icon:'\u{1F534}' },
-    { key:'eth-ls',   label:'ETH LONG+SHORT', from:53, to:56,  icon:'\u{1F7E1}' },
-    { key:'liq',      label:'LIQUIDACIONES',  from:200,to:999, icon:'\u{26A1}' },
+    { key:'legacy',   label:'LEGACY',        from:0,  to:35,  icon:'\xF0\x9F\x92\xBC' },
+    { key:'btc-long', label:'BTC LONG',       from:36, to:39,  icon:'\xF0\x9F\x9F\xA2' },
+    { key:'btc-short',label:'BTC SHORT',      from:40, to:43,  icon:'\xF0\x9F\x94\xB4' },
+    { key:'btc-ls',   label:'BTC LONG+SHORT', from:44, to:45,  icon:'\xF0\x9F\x9F\xA1' },
+    { key:'eth-long', label:'ETH LONG',       from:46, to:49,  icon:'\xF0\x9F\x9F\xA2' },
+    { key:'eth-short',label:'ETH SHORT',      from:50, to:52,  icon:'\xF0\x9F\x94\xB4' },
+    { key:'eth-ls',   label:'ETH LONG+SHORT', from:53, to:56,  icon:'\xF0\x9F\x9F\xA1' },
+    { key:'liq',      label:'LIQUIDACIONES',  from:200,to:999, icon:'\u26A1' },
   ];
 
   function _botGroup(idx){
