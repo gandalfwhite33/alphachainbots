@@ -92,7 +92,7 @@ SESSION_FILT     = ["none","asia","london","ny","london_ny_overlap","all_session
 POS_SIZING       = ["fixed","kelly","atr_based","volatility_adjusted"]
 MAX_TRADES_DAY   = [0, 1, 2, 5, 10]   # 0 = unlimited
 TRAIL_TYPES      = ["fixed","atr_dynamic","chandelier"]
-MIN_CONF         = [0, 1, 2, 3, 4, 5]
+MIN_CONF         = [0, 1, 2, 3]
 
 # Globales cargados en main() y compartidos por fork
 _FEAR_GREED_IDX: Optional[float] = None  # 0–100
