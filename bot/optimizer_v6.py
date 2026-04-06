@@ -379,33 +379,37 @@ def _roll_std(arr: np.ndarray, w: int) -> np.ndarray:
 
 def _macd(closes: np.ndarray, fast: int = 12, slow: int = 26,
           sig: int = 9) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    L = len(closes)
     ef = _ema(closes, fast); es = _ema(closes, slow)
-    line = ef - es
-    valid = ~np.isnan(line)
-    signal = np.full_like(line, np.nan)
-    idx = np.where(valid)[0]
-    if len(idx) >= sig:
-        start = idx[0]
-        signal[start:] = _ema(line[start:], sig)
+    line   = ef - es                          # shape (L,)
+    signal = np.full(L, np.nan)
+    # Find first non-NaN index in line, compute EMA of signal from there
+    valid_idx = np.where(~np.isnan(line))[0]
+    if len(valid_idx) >= sig:
+        start = valid_idx[0]
+        sig_sub = _ema(line[start:], sig)     # shape (L - start,)
+        signal[start:start + len(sig_sub)] = sig_sub
     hist = line - signal
-    return line, signal, hist
+    return line, signal, hist                 # all shape (L,)
 
 
 def _adx(high: np.ndarray, low: np.ndarray, close: np.ndarray, n: int = 14) -> np.ndarray:
-    adx = np.full_like(close, np.nan)
-    L = len(close)
+    L   = len(close)
+    adx = np.full(L, np.nan)
     if L < n * 2 + 2: return adx
-    tr = np.maximum(high[1:]-low[1:],
-         np.maximum(np.abs(high[1:]-close[:-1]), np.abs(low[1:]-close[:-1])))
+    # TR and DM arrays have length L-1 (diff over consecutive bars)
+    tr  = np.maximum(high[1:]-low[1:],
+          np.maximum(np.abs(high[1:]-close[:-1]), np.abs(low[1:]-close[:-1])))
     dmp = np.where((high[1:]-high[:-1]) > (low[:-1]-low[1:]),
                    np.maximum(high[1:]-high[:-1], 0.0), 0.0)
     dmm = np.where((low[:-1]-low[1:]) > (high[1:]-high[:-1]),
                    np.maximum(low[:-1]-low[1:], 0.0), 0.0)
-    N = len(tr)
+    N = len(tr)  # N = L - 1
     atr_w = np.zeros(N); dmp_w = np.zeros(N); dmm_w = np.zeros(N)
-    atr_w[n-1] = np.sum(tr[:n])
-    dmp_w[n-1] = np.sum(dmp[:n])
-    dmm_w[n-1] = np.sum(dmm[:n])
+    if n - 1 < N:
+        atr_w[n-1] = float(np.sum(tr[:n]))
+        dmp_w[n-1] = float(np.sum(dmp[:n]))
+        dmm_w[n-1] = float(np.sum(dmm[:n]))
     for i in range(n, N):
         atr_w[i] = atr_w[i-1] - atr_w[i-1]/n + tr[i]
         dmp_w[i] = dmp_w[i-1] - dmp_w[i-1]/n + dmp[i]
@@ -414,13 +418,17 @@ def _adx(high: np.ndarray, low: np.ndarray, close: np.ndarray, n: int = 14) -> n
         dip = np.where(atr_w > 0, dmp_w/atr_w*100, 0.0)
         dim = np.where(atr_w > 0, dmm_w/atr_w*100, 0.0)
         dx  = np.where(dip+dim > 0, np.abs(dip-dim)/(dip+dim)*100, 0.0)
+    # adx_arr is indexed over the diff space (length N = L-1)
+    # We map it back to the close space with a +1 offset
     adx_arr = np.full(N, np.nan)
-    if n*2-2 < N:
-        adx_arr[n*2-2] = float(np.mean(dx[n-1:n*2-1]))
-        for i in range(n*2-1, N):
+    first = n * 2 - 2
+    if first < N:
+        adx_arr[first] = float(np.mean(dx[n-1:n*2-1]))
+        for i in range(first + 1, N):
             adx_arr[i] = (adx_arr[i-1]*(n-1) + dx[i]) / n
-    adx[n:] = adx_arr
-    return adx
+    # adx_arr[i] corresponds to close[i+1] — shift by 1 to align
+    adx[1:] = adx_arr
+    return adx   # shape (L,)
 
 
 def _supertrend(high: np.ndarray, low: np.ndarray, close: np.ndarray,
