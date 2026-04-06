@@ -587,7 +587,7 @@ function render(d){
     { key:'eth-long', label:'ETH LONG',       from:46, to:49,  icon:'\xF0\x9F\x9F\xA2' },
     { key:'eth-short',label:'ETH SHORT',      from:50, to:52,  icon:'\xF0\x9F\x94\xB4' },
     { key:'eth-ls',   label:'ETH LONG+SHORT', from:53, to:56,  icon:'\xF0\x9F\x9F\xA1' },
-    { key:'liq',      label:'LIQUIDACIONES',  from:200,to:999, icon:'\u26A1' },
+    { key:'liq',      label:'LIQUIDACIONES',  from:18, to:25,  icon:'\u26A1' },
   ];
 
   function _botGroup(idx){
