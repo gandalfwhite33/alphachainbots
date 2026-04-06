@@ -625,12 +625,16 @@ _worker_ind: Dict[str, Dict[str, dict]] = {}
 
 
 def _worker_init(cache_pkl: str):
-    global _worker_ind, _FEAR_GREED_IDX, _FUNDING_RATE
+    global _worker_ind, _FEAR_GREED_IDX, _FUNDING_RATE, DIRECTION, COIN_ID, COINS
     try:
         with open(cache_pkl, "rb") as f:
             raw: dict = pickle.load(f)
         _FEAR_GREED_IDX = raw.get("_fng")
         _FUNDING_RATE   = raw.get("_funding")
+        # Restore globals overridden by main() — critical on Windows (spawn)
+        if raw.get("_direction"): DIRECTION = raw["_direction"]
+        if raw.get("_coin_id"):   COIN_ID   = raw["_coin_id"]
+        if raw.get("_coins"):     COINS     = raw["_coins"]
         candles         = raw.get("candles", {})
         btc_candles     = raw.get("btc_candles", {})
     except Exception:
@@ -1790,7 +1794,9 @@ def main():
     worker_pkl = out_dir / f"_wcache_{cl}.pkl"
     with open(worker_pkl, "wb") as f:
         pickle.dump({"candles": all_candles, "btc_candles": btc_candles,
-                     "_fng": fng, "_funding": funding}, f)
+                     "_fng": fng, "_funding": funding,
+                     "_direction": direction, "_coin_id": COIN_ID,
+                     "_coins": COINS}, f)
 
     # ── Test pool ─────────────────────────────────────────────────────────────
     print(f"[{ts()}] Iniciando ProcessPoolExecutor ({n_workers} workers)…", end=" ", flush=True)
