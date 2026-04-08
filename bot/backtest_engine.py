@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 backtest_engine.py — Motor de backtest histórico con datos reales de Hyperliquid.
+Usa la misma simulación que optimizer_master.py para resultados idénticos.
 Exporta: run_backtest_bg(period), get_result(period), get_progress(period)
 """
 
@@ -10,6 +11,9 @@ import threading
 import logging
 import requests
 from typing import Optional
+
+import numpy as np
+import optimizer_master as _opt
 
 log = logging.getLogger(__name__)
 
@@ -24,16 +28,46 @@ PERIODS = {"3m": 90, "6m": 180, "1y": 365, "max": 900}
 
 INTERVAL_MS = {
     "15m": 900_000, "30m": 1_800_000,
-    "1h": 3_600_000, "4h": 14_400_000,
+    "1h": 3_600_000, "2h": 7_200_000, "4h": 14_400_000,
 }
 
-# 15m/30m → too many candles for long periods, map to coarser for backtest
+# Usar el intervalo real del bot (no remapear a 1h)
 BT_INTERVAL_MAP = {
-    "15m": "1h", "30m": "1h",
-    "1h":  "1h", "4h":  "4h",
+    "15m": "15m", "30m": "30m",
+    "1h": "1h", "2h": "2h", "4h": "4h",
 }
 
-# ── CANDLE FETCH ───────────────────────────────────────────────────────────────
+# ── EXTERNAL DATA CACHE ──────────────────────────────────────────────────────
+_ext_cache = {"fng": None, "funding": None, "ts": 0}
+
+
+def _fetch_external_data():
+    """Fetch Fear & Greed y Funding Rate para evaluación de filtros."""
+    now = time.time()
+    if now - _ext_cache["ts"] < 300:
+        return _ext_cache["fng"], _ext_cache["funding"]
+    try:
+        r = requests.get("https://api.alternative.me/fng/?limit=1", timeout=5)
+        if r.ok:
+            d = r.json().get("data", [{}])[0]
+            _ext_cache["fng"] = float(d.get("value", 50))
+    except Exception:
+        pass
+    try:
+        r = requests.get(
+            "https://fapi.binance.com/fapi/v1/fundingRate?symbol=BTCUSDT&limit=1",
+            timeout=5)
+        if r.ok:
+            data = r.json()
+            if data:
+                _ext_cache["funding"] = float(data[-1].get("fundingRate", 0))
+    except Exception:
+        pass
+    _ext_cache["ts"] = now
+    return _ext_cache["fng"], _ext_cache["funding"]
+
+
+# ── CANDLE FETCH ──────────────────────────────────────────────────────────────
 
 def _fetch_candles(coin: str, interval: str, days: int) -> list:
     """Fetch historical OHLCV candles from Hyperliquid. Returns list of dicts."""
@@ -67,7 +101,7 @@ def _fetch_candles(coin: str, interval: str, days: int) -> list:
         return []
 
 
-# ── INDICATORS ─────────────────────────────────────────────────────────────────
+# ── LIST-BASED INDICATORS (para _bt_liq backward compat) ─────────────────────
 
 def _ema(closes: list, period: int) -> list:
     if len(closes) < period:
@@ -105,7 +139,7 @@ def _rsi(closes: list, period: int = 14) -> list:
     return result
 
 
-# ── METRICS ────────────────────────────────────────────────────────────────────
+# ── METRICS ───────────────────────────────────────────────────────────────────
 
 def _compute_metrics(equity_snaps: list, trades: list,
                      initial: float, days: int) -> dict:
@@ -177,111 +211,283 @@ def _downsample(snaps: list, target: int) -> list:
     return result
 
 
-# ── EMA / SMA CROSSOVER BACKTEST ───────────────────────────────────────────────
+# ── INDICADORES PARA UNA MONEDA (idéntico al optimizer) ──────────────────────
+
+def _compute_indicators(candles_list: list, btc_candles_list: list = None) -> dict:
+    """Construye dict de indicadores idéntico a optimizer_master._worker_init."""
+    arr = np.array([[c["t"], c["o"], c["h"], c["l"], c["c"], c["v"]]
+                    for c in candles_list], dtype=np.float64)
+    if len(arr) < 250:
+        return None
+
+    ts_col = arr[:, 0]; opens = arr[:, 1]; highs = arr[:, 2]
+    lows = arr[:, 3]; closes = arr[:, 4]; volumes = arr[:, 5]
+
+    atr14 = _opt._atr(highs, lows, closes, 14)
+    rsi14 = _opt._rsi(closes, 14)
+    ema200 = _opt._ema(closes, 200)
+    vol_ma = _opt._sma(volumes, 20)
+    roll_hi = _opt._roll_max(highs, 60)
+    roll_lo = _opt._roll_min(lows, 60)
+
+    macd_l, macd_s, macd_h = _opt._macd(closes)
+    lb = 14
+    macd_bull_div = np.zeros(len(closes), dtype=bool)
+    macd_bear_div = np.zeros(len(closes), dtype=bool)
+    for i in range(lb * 2, len(closes)):
+        if macd_h[i] != macd_h[i]:
+            continue
+        sl_c = closes[i - lb:i]; sl_mh = macd_h[i - lb:i]
+        lo_c = _opt._safe_nanmin(sl_c); hi_c = _opt._safe_nanmax(sl_c)
+        lo_mh = _opt._safe_nanmin(sl_mh); hi_mh = _opt._safe_nanmax(sl_mh)
+        if np.isnan(lo_c) or np.isnan(hi_c) or np.isnan(lo_mh) or np.isnan(hi_mh):
+            continue
+        if closes[i] <= lo_c and macd_h[i] > lo_mh:
+            macd_bull_div[i] = True
+        if closes[i] >= hi_c and macd_h[i] < hi_mh:
+            macd_bear_div[i] = True
+
+    adx = _opt._adx(highs, lows, closes)
+    st = _opt._supertrend(highs, lows, closes)
+    tenkan, kijun, span_a, span_b = _opt._ichimoku(highs, lows, closes)
+    cloud_top = np.maximum(span_a, span_b)
+    cloud_bot = np.minimum(span_a, span_b)
+    sk, sd = _opt._stoch_rsi(closes)
+    cci = _opt._cci(highs, lows, closes)
+    wr = _opt._williams_r_arr(highs, lows, closes)
+    mom10 = closes - np.roll(closes, 10); mom10[:10] = np.nan
+    bb_u, bb_l, bb_w = _opt._bbands(closes)
+    kelt_u, kelt_l = _opt._keltner(highs, lows, closes)
+    bb_w_sma = _opt._sma(bb_w, 20)
+    obv_arr = _opt._obv(closes, volumes)
+    obv_ema = _opt._ema(obv_arr, 20)
+
+    obv_bull_div = np.zeros(len(closes), dtype=bool)
+    obv_bear_div = np.zeros(len(closes), dtype=bool)
+    for i in range(lb * 2, len(closes)):
+        sl_c = closes[i - lb:i]; sl_o = obv_arr[i - lb:i]
+        lo_c = _opt._safe_nanmin(sl_c); hi_c = _opt._safe_nanmax(sl_c)
+        lo_o = _opt._safe_nanmin(sl_o); hi_o = _opt._safe_nanmax(sl_o)
+        if np.isnan(lo_c) or np.isnan(hi_c) or np.isnan(lo_o) or np.isnan(hi_o):
+            continue
+        if closes[i] <= lo_c and obv_arr[i] > lo_o:
+            obv_bull_div[i] = True
+        if closes[i] >= hi_c and obv_arr[i] < hi_o:
+            obv_bear_div[i] = True
+
+    vwap_arr = _opt._vwap_daily(ts_col, highs, lows, closes, volumes)
+    cvd_arr = _opt._cvd(opens, closes, volumes)
+    cvd_ema = _opt._ema(cvd_arr.astype(float), 14)
+    ms_arr = _opt._market_structure(highs, lows)
+    ob_bull, ob_bear = _opt._order_blocks(closes, atr14)
+    piv_p, piv_r1, piv_r2, piv_s1, piv_s2 = _opt._pivot_levels(
+        ts_col, highs, lows, closes, weekly=False)
+    wpiv_p, wpiv_r1, wpiv_r2, wpiv_s1, wpiv_s2 = _opt._pivot_levels(
+        ts_col, highs, lows, closes, weekly=True)
+    rsi_bull_div, rsi_bear_div = _opt._rsi_divergence_arr(closes, rsi14)
+    psar_arr = _opt._parabolic_sar(highs, lows)
+
+    price_mean = float(np.nanmean(closes))
+    atr_valid = atr14[~np.isnan(atr14)]
+    atr_pct_ref = (float(np.nanmean(atr_valid)) / price_mean
+                   if len(atr_valid) > 0 and price_mean > 0 else 0.0)
+    atr_std = float(np.nanstd(atr_valid)) if len(atr_valid) > 1 else 0.0
+    atr_mean = float(np.nanmean(atr_valid)) if len(atr_valid) > 0 else 0.0
+
+    roll_hi10 = _opt._roll_max(highs, 10);  roll_lo10 = _opt._roll_min(lows, 10)
+    roll_hi20 = _opt._roll_max(highs, 20);  roll_lo20 = _opt._roll_min(lows, 20)
+    roll_hi50 = _opt._roll_max(highs, 50);  roll_lo50 = _opt._roll_min(lows, 50)
+    roll_hi100 = _opt._roll_max(highs, 100); roll_lo100 = _opt._roll_min(lows, 100)
+
+    # BTC trend para btc_correlation
+    btc_trend = None
+    if btc_candles_list is not None and len(btc_candles_list) >= 60:
+        btc_arr = np.array([[c["t"], c["o"], c["h"], c["l"], c["c"], c["v"]]
+                            for c in btc_candles_list], dtype=np.float64)
+        if len(btc_arr) >= 60:
+            bc = btc_arr[:, 4]
+            e20 = _opt._ema(bc, 20); e50 = _opt._ema(bc, 50)
+            btc_trend = np.where(e20 > e50, 1.0, -1.0)
+
+    ind = {
+        "ts": ts_col, "opens": opens, "highs": highs, "lows": lows,
+        "closes": closes, "volumes": volumes,
+        "ema200": ema200, "rsi14": rsi14, "atr14": atr14,
+        "vol_ma": vol_ma, "roll_hi": roll_hi, "roll_lo": roll_lo,
+        "h_london": _opt._hour_mask(ts_col, _opt._LONDON_NY),
+        "h_asia":   _opt._hour_mask(ts_col, _opt._ASIA),
+        "h_ny":     _opt._hour_mask(ts_col, _opt._NY),
+        "h_lno":    _opt._hour_mask(ts_col, _opt._LDN_NY_OV),
+        "atr_pct_ref": atr_pct_ref, "price_mean": price_mean,
+        "atr_mean": atr_mean, "atr_std": atr_std,
+        "macd_l": macd_l, "macd_s": macd_s, "macd_h": macd_h,
+        "macd_bull_div": macd_bull_div, "macd_bear_div": macd_bear_div,
+        "adx": adx, "st": st,
+        "cloud_top": cloud_top, "cloud_bot": cloud_bot,
+        "tenkan": tenkan, "kijun": kijun,
+        "sk": sk, "sd": sd, "cci": cci, "wr": wr, "mom10": mom10,
+        "bb_u": bb_u, "bb_l": bb_l, "bb_w": bb_w, "bb_w_sma": bb_w_sma,
+        "kelt_u": kelt_u, "kelt_l": kelt_l,
+        "obv": obv_arr, "obv_ema": obv_ema,
+        "obv_bull_div": obv_bull_div, "obv_bear_div": obv_bear_div,
+        "vwap": vwap_arr, "cvd": cvd_arr.astype(float), "cvd_ema": cvd_ema,
+        "ms": ms_arr, "ob_bull": ob_bull, "ob_bear": ob_bear,
+        "piv_p": piv_p, "piv_r1": piv_r1, "piv_r2": piv_r2,
+        "piv_s1": piv_s1, "piv_s2": piv_s2,
+        "wpiv_p": wpiv_p, "wpiv_r1": wpiv_r1, "wpiv_r2": wpiv_r2,
+        "wpiv_s1": wpiv_s1, "wpiv_s2": wpiv_s2,
+        "rsi_bull_div": rsi_bull_div, "rsi_bear_div": rsi_bear_div,
+        "psar": psar_arr,
+        "roll_hi10": roll_hi10, "roll_lo10": roll_lo10,
+        "roll_hi20": roll_hi20, "roll_lo20": roll_lo20,
+        "roll_hi50": roll_hi50, "roll_lo50": roll_lo50,
+        "roll_hi100": roll_hi100, "roll_lo100": roll_lo100,
+        "btc_trend": btc_trend,
+    }
+
+    # Precalcular MAs para todos los pares
+    for (ma_type, fast, slow) in _opt.MA_PAIRS:
+        k = f"{ma_type}_{fast}_{slow}"
+        fn = _opt._ema if ma_type == "ema" else _opt._sma
+        ind[f"maf_{k}"] = fn(closes, fast)
+        ind[f"mas_{k}"] = fn(closes, slow)
+
+    return ind
+
+
+# ── BOTCONFIG → OPTPARAMS ────────────────────────────────────────────────────
+
+def _cfg_to_params(cfg, coin: str) -> _opt.OptParams:
+    """Convierte BotConfig + coin a OptParams para _simulate_fast."""
+    return _opt.OptParams(
+        interval=cfg.interval,
+        ma_type=cfg.ma_type,
+        ma_fast=cfg.ma_fast,
+        ma_slow=cfg.ma_slow,
+        leverage=cfg.leverage,
+        trailing_pct=cfg.trailing_pct,
+        sl_type=getattr(cfg, "sl_type", "trailing"),
+        fib_mode=getattr(cfg, "fib_mode", "disabled"),
+        rsi_filter=getattr(cfg, "rsi_filter", "none"),
+        ema200_filter=getattr(cfg, "ema200_filter", "none"),
+        atr_filter=getattr(cfg, "atr_filter", "none"),
+        compound=getattr(cfg, "compound", True),
+        time_filter=getattr(cfg, "time_filter", "none"),
+        vol_profile=getattr(cfg, "vol_profile", "disabled"),
+        liq_confirm=getattr(cfg, "liq_confirm", False),
+        risk_pct=getattr(cfg, "risk_per_trade", 0.02),
+        macd_filter=getattr(cfg, "macd_filter", "none"),
+        adx_filter=getattr(cfg, "adx_filter", "none"),
+        supertrend_filter=getattr(cfg, "supertrend_filter", "none"),
+        ichimoku_filter=getattr(cfg, "ichimoku_filter", "none"),
+        stoch_rsi=getattr(cfg, "stoch_rsi", "none"),
+        cci_filter=getattr(cfg, "cci_filter", "none"),
+        williams_r=getattr(cfg, "williams_r", "none"),
+        momentum_filter=getattr(cfg, "momentum_filter", "none"),
+        bb_filter=getattr(cfg, "bb_filter", "none"),
+        atr_volatility=getattr(cfg, "atr_volatility", "none"),
+        keltner_filter=getattr(cfg, "keltner_filter", "none"),
+        obv_filter=getattr(cfg, "obv_filter", "none"),
+        vwap_filter=getattr(cfg, "vwap_filter", "none"),
+        volume_delta=getattr(cfg, "volume_delta", "none"),
+        cvd_filter=getattr(cfg, "cvd_filter", "none"),
+        market_structure=getattr(cfg, "market_structure", "none"),
+        breakout_range=getattr(cfg, "breakout_range", "none"),
+        candle_pattern=getattr(cfg, "candle_pattern", "none"),
+        order_block=getattr(cfg, "order_block", "none"),
+        pivot_filter=getattr(cfg, "pivot_filter", "none"),
+        sr_breakout=getattr(cfg, "sr_breakout", "none"),
+        fib_retracement=getattr(cfg, "fib_retracement", "none"),
+        rsi_divergence=getattr(cfg, "rsi_divergence", "none"),
+        btc_correlation=getattr(cfg, "btc_correlation", "none"),
+        funding_filter=getattr(cfg, "funding_filter", "none"),
+        fear_greed_filter=getattr(cfg, "fear_greed_filter", "none"),
+        session_filter=getattr(cfg, "session_filter", "none"),
+        position_sizing=getattr(cfg, "position_sizing", "fixed"),
+        max_trades_day=getattr(cfg, "max_trades_day", 0),
+        trailing_type=getattr(cfg, "trailing_type", "fixed"),
+        min_confluences=getattr(cfg, "min_confluences", 0),
+        tp_type=getattr(cfg, "tp_type", "none"),
+        tp_pct=getattr(cfg, "tp_pct", 10),
+        tp_atr=getattr(cfg, "tp_atr", 2.0),
+        trailing_activation=getattr(cfg, "trailing_activation", "none"),
+        trailing_progressive=getattr(cfg, "trailing_progressive", False),
+        atr_tp_adjust=getattr(cfg, "atr_tp_adjust", "none"),
+        partial_close=getattr(cfg, "partial_close", "none"),
+        partial_trigger=getattr(cfg, "partial_trigger", "1atr"),
+        breakeven=getattr(cfg, "breakeven", "none"),
+        time_exit=getattr(cfg, "time_exit", "none"),
+        session_exit=getattr(cfg, "session_exit", False),
+        weekend_exit=getattr(cfg, "weekend_exit", False),
+        rr_min=getattr(cfg, "rr_min", "none"),
+        coin=coin,
+        direction=getattr(cfg, "direction", "both"),
+    )
+
+
+# ── EMA / SMA CROSSOVER BACKTEST (usa simulación del optimizer) ──────────────
 
 def _bt_crossover(cfg, candles_cache: dict, days: int,
                   coins_override: list = None) -> dict:
     """
-    Backtest for EMA/SMA crossover bots.
-    cfg: BotConfig — uses label, ma_type, ma_fast, ma_slow, trailing_pct, leverage, risk_per_trade
-    coins_override: if provided, restrict to these coins instead of cfg.coins
+    Backtest usando _simulate_fast del optimizer — resultados idénticos.
+    cfg: BotConfig con todos los filtros del optimizer.
     """
-    bt_interval = BT_INTERVAL_MAP.get(cfg.interval, "1h")
-    leverage    = getattr(cfg, "leverage", BT_LEVERAGE)
-    risk_pct    = getattr(cfg, "risk_per_trade", RISK_PCT)
-    trailing    = cfg.trailing_pct
+    bt_interval = BT_INTERVAL_MAP.get(cfg.interval, cfg.interval)
 
     from sim_engine import FALLBACK_COINS
     cfg_coins = cfg.coins if getattr(cfg, "coins", None) else FALLBACK_COINS[:6]
     if coins_override:
-        # Only run on coins that both the bot supports AND the user selected
         bt_coins = [c for c in cfg_coins if c in coins_override]
         if not bt_coins:
             bt_coins = []
     else:
         bt_coins = cfg_coins
 
-    all_events  = []   # (ts, pnl_usd)
-    all_trades  = []
+    # Obtener datos externos si hay filtros que los necesitan
+    fng_val, fund_val = None, None
+    if (getattr(cfg, "fear_greed_filter", "none") != "none" or
+            getattr(cfg, "funding_filter", "none") != "none"):
+        fng_val, fund_val = _fetch_external_data()
 
-    coin_equity = INITIAL_EQUITY
+    all_events = []
+    all_trades = []
 
     for coin in bt_coins:
         key = f"{coin}_{bt_interval}"
-        df  = candles_cache.get(key, [])
-        if len(df) < cfg.ma_slow + 10:
+        df = candles_cache.get(key, [])
+        if len(df) < max(cfg.ma_slow + 260, 300):
             continue
 
-        closes = [c["c"] for c in df]
-        tss    = [c["t"] for c in df]
+        # Candles BTC para filtro btc_correlation
+        btc_candles = None
+        if getattr(cfg, "btc_correlation", "none") != "none" and coin != "BTC":
+            btc_key = f"BTC_{bt_interval}"
+            btc_candles = candles_cache.get(btc_key)
 
-        if cfg.ma_type == "ema":
-            fast_s = _ema(closes, cfg.ma_fast)
-            slow_s = _ema(closes, cfg.ma_slow)
-        else:
-            fast_s = _sma(closes, cfg.ma_fast)
-            slow_s = _sma(closes, cfg.ma_slow)
+        # Calcular indicadores (idéntico al optimizer)
+        ind = _compute_indicators(df, btc_candles)
+        if ind is None:
+            continue
 
-        off_f = len(closes) - len(fast_s)
-        off_s = len(closes) - len(slow_s)
-        start = max(off_f, off_s) + 1
+        # Construir OptParams desde BotConfig
+        params = _cfg_to_params(cfg, coin)
 
-        in_pos  = False
-        dir_    = ""
-        entry   = 0.0
-        best    = 0.0
-        stop    = 0.0
-        eq_coin = coin_equity
+        # Ejecutar simulación idéntica al optimizer
+        result, events, trades = _opt._simulate_fast(
+            params, ind,
+            return_events=True,
+            fng_override=fng_val,
+            fund_override=fund_val,
+        )
 
-        for i in range(start, len(df)):
-            fi = i - off_f
-            si = i - off_s
-            if fi < 1 or si < 1:
-                continue
-
-            price = closes[i]
-            ts    = tss[i]
-            fc    = fast_s[fi];  fp = fast_s[fi - 1]
-            sc    = slow_s[si];  sp = slow_s[si - 1]
-
-            if in_pos:
-                if dir_ == "long":
-                    if price > best:
-                        best = price; stop = best * (1 - trailing)
-                    if price <= stop:
-                        pnl = eq_coin * risk_pct * (price - entry) / entry * leverage
-                        eq_coin += pnl
-                        all_events.append((ts, pnl))
-                        all_trades.append({"pnl": round(pnl, 2)})
-                        in_pos = False
-                else:
-                    if price < best:
-                        best = price; stop = best * (1 + trailing)
-                    if price >= stop:
-                        pnl = eq_coin * risk_pct * (entry - price) / entry * leverage
-                        eq_coin += pnl
-                        all_events.append((ts, pnl))
-                        all_trades.append({"pnl": round(pnl, 2)})
-                        in_pos = False
-
-            if not in_pos:
-                up   = fp <= sp and fc > sc
-                down = fp >= sp and fc < sc
-                direction = getattr(cfg, "direction", "both")
-                if direction == "long":
-                    up = up; down = False
-                elif direction == "short":
-                    up = False; down = down
-                if up or down:
-                    in_pos = True
-                    dir_   = "long" if up else "short"
-                    entry  = price; best = price
-                    stop   = entry * (1 - trailing) if dir_ == "long" else entry * (1 + trailing)
+        all_events.extend(events)
+        all_trades.extend(trades)
 
     return _build_result(all_events, all_trades, days)
 
 
-# ── LIQUIDATION BOT BACKTEST (simplified proxies) ─────────────────────────────
+# ── LIQUIDATION BOT BACKTEST (sin cambios) ───────────────────────────────────
 
 def _bt_liq(cfg, candles_cache: dict, days: int,
             coins_override: list = None) -> dict:
@@ -364,7 +570,6 @@ def _liq_signal(strategy: str, closes: list, volumes: list,
     price = closes[i]
 
     if strategy in ("agresivo", "moderado"):
-        # Fade 1.5% moves
         move = (closes[i] - closes[i - 4]) / closes[i - 4]
         if move < -0.015: return "long"
         if move >  0.015: return "short"
@@ -377,22 +582,19 @@ def _liq_signal(strategy: str, closes: list, volumes: list,
         if move >  0.025 and vol_ok: return "short"
 
     elif strategy == "funding":
-        # RSI extremes as funding proxy
-        rsi_i = i - 20  # rsi_vals starts 20 candles later
+        rsi_i = i - 20
         if rsi_i < 0 or rsi_i >= len(rsi_vals): return None
-        rsi = rsi_vals[rsi_i]
-        if rsi < 25: return "long"
-        if rsi > 75: return "short"
+        rsi_v = rsi_vals[rsi_i]
+        if rsi_v < 25: return "long"
+        if rsi_v > 75: return "short"
 
     elif strategy == "cascada":
-        # 4 consecutive same-direction candles
         if i < 4: return None
         last4 = [closes[j] - closes[j - 1] for j in range(i - 3, i + 1)]
         if all(d < 0 for d in last4): return "long"
         if all(d > 0 for d in last4): return "short"
 
     elif strategy in ("oi_div", "oi_divergencia"):
-        # Price up + volume down → OI divergence proxy
         pmove = (closes[i] - closes[i - 4]) / closes[i - 4]
         avg_v = sum(volumes[i - 4:i]) / 4 if sum(volumes[i - 4:i]) > 0 else 1
         vmove = (volumes[i] - avg_v) / avg_v
@@ -400,7 +602,6 @@ def _liq_signal(strategy: str, closes: list, volumes: list,
         if pmove < -0.005 and vmove < -0.10: return "long"
 
     elif strategy == "whale":
-        # Oversized candle body vs average
         body = abs(closes[i] - closes[i - 1]) / closes[i - 1] if closes[i - 1] > 0 else 0
         avg_bodies = [abs(closes[j] - closes[j - 1]) / closes[j - 1]
                       for j in range(i - 10, i) if closes[j - 1] > 0]
@@ -409,7 +610,6 @@ def _liq_signal(strategy: str, closes: list, volumes: list,
             return "short" if closes[i] > closes[i - 1] else "long"
 
     elif strategy == "contra":
-        # Fade large 2h move
         move = (closes[i] - closes[i - 2]) / closes[i - 2]
         if move < -0.02: return "long"
         if move >  0.02: return "short"
@@ -433,7 +633,7 @@ def _build_result(events: list, trades: list, days: int) -> dict:
     return _compute_metrics(snaps, trades, INITIAL_EQUITY, days)
 
 
-# ── CACHE & THREAD MANAGEMENT ─────────────────────────────────────────────────
+# ── CACHE & THREAD MANAGEMENT ────────────────────────────────────────────────
 
 _cache:    dict          = {}
 _progress: dict          = {}
@@ -474,21 +674,22 @@ def _run(period: str, coins_key: str = "BTC"):
     ck = _cache_key(period, coins_key)
     try:
         days = PERIODS.get(period, 90)
-        # Parse coins_key → list (e.g. "BTC,ETH" → ["BTC","ETH"])
         coins_override = [c.strip().upper() for c in coins_key.split(",") if c.strip()]
         log.info(f"[BT] Starting backtest period={period} coins={coins_override}")
 
         from sim_engine import CONFIGS, LIQ_CONFIGS, FALLBACK_COINS
 
-        # Collect required candle keys — respect each bot's own coin list
+        # Recoger intervalos necesarios (usar intervalo real del bot)
         needed = set()
         for cfg in CONFIGS:
-            iv = BT_INTERVAL_MAP.get(cfg.interval, "1h")
+            iv = BT_INTERVAL_MAP.get(cfg.interval, cfg.interval)
             cfg_coins = cfg.coins if getattr(cfg, "coins", None) else FALLBACK_COINS[:6]
-            # Only fetch candles for coins in the override set
             for coin in cfg_coins:
                 if coin in coins_override:
                     needed.add((coin, iv))
+            # BTC candles para btc_correlation
+            if getattr(cfg, "btc_correlation", "none") != "none":
+                needed.add(("BTC", iv))
         for coin in coins_override:
             needed.add((coin, "1h"))
 
@@ -501,7 +702,7 @@ def _run(period: str, coins_key: str = "BTC"):
             done += n
             _progress[ck] = min(99, int(done / total_steps * 100))
 
-        # Fetch candles (with rate-limit courtesy sleep)
+        # Fetch candles
         candles_cache = {}
         for coin, iv in needed:
             key = f"{coin}_{iv}"
@@ -510,7 +711,7 @@ def _run(period: str, coins_key: str = "BTC"):
                 time.sleep(0.12)
             _upd()
 
-        # Backtest EMA/SMA bots
+        # Backtest EMA/SMA bots (usa simulación del optimizer)
         results = []
         for cfg in CONFIGS:
             r = _bt_crossover(cfg, candles_cache, days, coins_override=coins_override)

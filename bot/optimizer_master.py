@@ -842,13 +842,19 @@ def _calc_breakeven_trigger(breakeven: str, signal: str, entry: float, av: float
 
 
 # ─── SIMULACIÓN ───────────────────────────────────────────────────────────────
-def _simulate_fast(params: OptParams, ind: dict) -> dict:
-    """Simula un bot en una sola moneda. ind = indicadores precalculados para esa moneda."""
+def _simulate_fast(params: OptParams, ind: dict,
+                   return_events: bool = False,
+                   fng_override: Optional[float] = None,
+                   fund_override: Optional[float] = None) -> dict:
+    """Simula un bot en una sola moneda. ind = indicadores precalculados para esa moneda.
+    Si return_events=True, devuelve (metrics, events, trades_list) para backtest_engine."""
     all_pnl = 0.0; all_trades = 0; all_wins = 0
     gross_win = 0.0; gross_loss = 0.0
     all_best = 0.0; all_worst = 0.0; total_partial_exits = 0
     equity = INITIAL_EQUITY; peak_equity = INITIAL_EQUITY; max_dd = 0.0
     eq_curve = [INITIAL_EQUITY]
+    _evt = [] if return_events else None
+    _trl = [] if return_events else None
 
     direction = params.direction
     min_bars  = max(params.ma_slow + 50, 260)
@@ -882,20 +888,20 @@ def _simulate_fast(params: OptParams, ind: dict) -> dict:
     wknd_exit = params.weekend_exit; rr_min_p = params.rr_min
     rr_min_val = float(rr_min_p) if rr_min_p != "none" else None
     time_exit_n = int(time_exit_p) if time_exit_p != "none" else None
-    fng_val = _FEAR_GREED_IDX; fund_val = _FUNDING_RATE
+    fng_val = fng_override if fng_override is not None else _FEAR_GREED_IDX
+    fund_val = fund_override if fund_override is not None else _FUNDING_RATE
     is_btc = (params.coin == "BTC")
 
     closes = ind.get("closes")
+    _empty = {"total_pnl": 0.0, "total_pnl_pct": 0.0, "win_rate": 0.0, "total_trades": 0,
+              "max_drawdown": 0.0, "sharpe": 0.0, "profit_factor": 0.0,
+              "best_trade": 0.0, "worst_trade": 0.0, "partial_exits": 0}
     if closes is None or len(closes) < min_bars + 10:
-        return {"total_pnl": 0.0, "total_pnl_pct": 0.0, "win_rate": 0.0, "total_trades": 0,
-                "max_drawdown": 0.0, "sharpe": 0.0, "profit_factor": 0.0,
-                "best_trade": 0.0, "worst_trade": 0.0, "partial_exits": 0}
+        return (_empty, [], []) if return_events else _empty
 
     maf = ind.get(f"maf_{ma_key}"); mas = ind.get(f"mas_{ma_key}")
     if maf is None or mas is None:
-        return {"total_pnl": 0.0, "total_pnl_pct": 0.0, "win_rate": 0.0, "total_trades": 0,
-                "max_drawdown": 0.0, "sharpe": 0.0, "profit_factor": 0.0,
-                "best_trade": 0.0, "worst_trade": 0.0, "partial_exits": 0}
+        return (_empty, [], []) if return_events else _empty
 
     if time_filt == "london_ny":            hour_ok = ind["h_london"]
     elif time_filt == "asia":               hour_ok = ind["h_asia"]
@@ -1001,6 +1007,7 @@ def _simulate_fast(params: OptParams, ind: dict) -> dict:
                             size_p = coin_equity * eff_risk_p / entry * part_frac * frac
                             pnl_p  = size_p * (trig - entry) if dir_ == "long" else size_p * (entry - trig)
                             all_pnl += pnl_p; total_partial_exits += 1
+                            if _evt is not None: _evt.append((float(ts_col[i]), pnl_p)); _trl.append({"pnl": round(pnl_p, 2)})
                             if compound: coin_equity = max(coin_equity + pnl_p, 1.0)
                             equity += pnl_p
                             if equity > peak_equity: peak_equity = equity
@@ -1044,6 +1051,7 @@ def _simulate_fast(params: OptParams, ind: dict) -> dict:
                 if pnl > 0: kel_wins += 1; kel_gross_w += pnl
                 else: kel_gross_l += -pnl
                 all_pnl += pnl; all_trades += 1
+                if _evt is not None: _evt.append((float(ts_col[i]), pnl)); _trl.append({"pnl": round(pnl, 2)})
                 if pnl > 0: all_wins += 1; gross_win += pnl
                 else: gross_loss += -pnl
                 if pnl > all_best:  all_best  = pnl
@@ -1063,9 +1071,11 @@ def _simulate_fast(params: OptParams, ind: dict) -> dict:
         if not (pf1==pf1 and ps1==ps1 and cf1==cf1 and cs1==cs1): continue
 
         if direction == "long":
-            if not (pf1 < ps1 and cf1 > cs1): continue; signal = "long"
+            if not (pf1 < ps1 and cf1 > cs1): continue
+            signal = "long"
         elif direction == "short":
-            if not (pf1 > ps1 and cf1 < cs1): continue; signal = "short"
+            if not (pf1 > ps1 and cf1 < cs1): continue
+            signal = "short"
         else:
             if   pf1 < ps1 and cf1 > cs1: signal = "long"
             elif pf1 > ps1 and cf1 < cs1: signal = "short"
@@ -1391,9 +1401,10 @@ def _simulate_fast(params: OptParams, ind: dict) -> dict:
         }
 
     if all_trades == 0:
-        return {"total_pnl": 0.0, "total_pnl_pct": 0.0, "win_rate": 0.0, "total_trades": 0,
-                "max_drawdown": 0.0, "sharpe": 0.0, "profit_factor": 0.0,
-                "best_trade": 0.0, "worst_trade": 0.0, "partial_exits": 0}
+        _empty0 = {"total_pnl": 0.0, "total_pnl_pct": 0.0, "win_rate": 0.0, "total_trades": 0,
+                    "max_drawdown": 0.0, "sharpe": 0.0, "profit_factor": 0.0,
+                    "best_trade": 0.0, "worst_trade": 0.0, "partial_exits": 0}
+        return (_empty0, [], []) if return_events else _empty0
 
     win_rate      = all_wins / all_trades * 100.0
     total_pnl_pct = all_pnl / INITIAL_EQUITY * 100.0
@@ -1404,13 +1415,14 @@ def _simulate_fast(params: OptParams, ind: dict) -> dict:
     else:
         sharpe = 0.0
     profit_factor = gross_win / gross_loss if gross_loss > 0 else (2.0 if gross_win > 0 else 1.0)
-    return {
+    _result = {
         "total_pnl":     round(all_pnl, 2), "total_pnl_pct": round(total_pnl_pct, 2),
         "win_rate":      round(win_rate, 2), "total_trades":  all_trades,
         "max_drawdown":  round(max_dd, 2),   "sharpe":        round(sharpe, 3),
         "profit_factor": round(profit_factor, 3), "best_trade": round(all_best, 2),
         "worst_trade":   round(all_worst, 2), "partial_exits": total_partial_exits,
     }
+    return (_result, _evt, _trl) if return_events else _result
 
 
 # ─── WORKER FUNCTIONS ─────────────────────────────────────────────────────────
@@ -1660,6 +1672,51 @@ def save_master_bots(out_dir: Path, recommended: List[dict]):
             "atr_filter":    r.get("atr_filter", "none"),
             "tp_type":       r.get("tp_type", "none"),
             "trailing_type": r.get("trailing_type", "none"),
+            "macd_filter":   r.get("macd_filter", "none"),
+            "adx_filter":    r.get("adx_filter", "none"),
+            "supertrend_filter": r.get("supertrend_filter", "none"),
+            "ichimoku_filter":   r.get("ichimoku_filter", "none"),
+            "stoch_rsi":     r.get("stoch_rsi", "none"),
+            "cci_filter":    r.get("cci_filter", "none"),
+            "williams_r":    r.get("williams_r", "none"),
+            "momentum_filter": r.get("momentum_filter", "none"),
+            "bb_filter":     r.get("bb_filter", "none"),
+            "atr_volatility": r.get("atr_volatility", "none"),
+            "keltner_filter": r.get("keltner_filter", "none"),
+            "obv_filter":    r.get("obv_filter", "none"),
+            "vwap_filter":   r.get("vwap_filter", "none"),
+            "volume_delta":  r.get("volume_delta", "none"),
+            "cvd_filter":    r.get("cvd_filter", "none"),
+            "market_structure": r.get("market_structure", "none"),
+            "breakout_range": r.get("breakout_range", "none"),
+            "candle_pattern": r.get("candle_pattern", "none"),
+            "order_block":   r.get("order_block", "none"),
+            "pivot_filter":  r.get("pivot_filter", "none"),
+            "sr_breakout":   r.get("sr_breakout", "none"),
+            "fib_retracement": r.get("fib_retracement", "none"),
+            "rsi_divergence": r.get("rsi_divergence", "none"),
+            "btc_correlation": r.get("btc_correlation", "none"),
+            "funding_filter": r.get("funding_filter", "none"),
+            "fear_greed_filter": r.get("fear_greed_filter", "none"),
+            "session_filter": r.get("session_filter", "none"),
+            "partial_close": r.get("partial_close", "none"),
+            "partial_trigger": r.get("partial_trigger", "1atr"),
+            "breakeven":     r.get("breakeven", "none"),
+            "min_confluences": r.get("min_confluences", 0),
+            "position_sizing": r.get("position_sizing", "fixed"),
+            "fib_mode":      r.get("fib_mode", "disabled"),
+            "compound":      r.get("compound", True),
+            "vol_profile":   r.get("vol_profile", "disabled"),
+            "max_trades_day": r.get("max_trades_day", 0),
+            "tp_pct":        r.get("tp_pct", 10),
+            "tp_atr":        r.get("tp_atr", 2.0),
+            "trailing_activation": r.get("trailing_activation", "none"),
+            "trailing_progressive": r.get("trailing_progressive", False),
+            "atr_tp_adjust": r.get("atr_tp_adjust", "none"),
+            "time_exit":     r.get("time_exit", "none"),
+            "session_exit":  r.get("session_exit", False),
+            "weekend_exit":  r.get("weekend_exit", False),
+            "rr_min":        r.get("rr_min", "none"),
             # métricas de referencia
             "_sharpe":       r.get("sharpe", 0),
             "_pnl_pct":      r.get("total_pnl_pct", 0),

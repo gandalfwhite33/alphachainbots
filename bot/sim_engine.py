@@ -84,6 +84,53 @@ class BotConfig:
     direction:      str   = "both"      # "long" | "short" | "both"
     tp_type:        str   = "none"      # "none" | "fixed_pct" | "atr_multiple" | etc.
     trailing_type:  str   = "none"      # "none" | "fixed" | "atr_dynamic" | "chandelier"
+    # ── Filtros del optimizer (v7/master) ──────────────────────────────────
+    macd_filter:        str   = "none"
+    adx_filter:         str   = "none"
+    supertrend_filter:  str   = "none"
+    ichimoku_filter:    str   = "none"
+    stoch_rsi:          str   = "none"
+    cci_filter:         str   = "none"
+    williams_r:         str   = "none"
+    momentum_filter:    str   = "none"
+    bb_filter:          str   = "none"
+    atr_volatility:     str   = "none"
+    keltner_filter:     str   = "none"
+    obv_filter:         str   = "none"
+    vwap_filter:        str   = "none"
+    volume_delta:       str   = "none"
+    cvd_filter:         str   = "none"
+    market_structure:   str   = "none"
+    breakout_range:     str   = "none"
+    candle_pattern:     str   = "none"
+    order_block:        str   = "none"
+    pivot_filter:       str   = "none"
+    sr_breakout:        str   = "none"
+    fib_retracement:    str   = "none"
+    rsi_divergence:     str   = "none"
+    btc_correlation:    str   = "none"
+    funding_filter:     str   = "none"
+    fear_greed_filter:  str   = "none"
+    session_filter:     str   = "none"
+    partial_close:      str   = "none"
+    partial_trigger:    str   = "1atr"
+    breakeven:          str   = "none"
+    min_confluences:    int   = 0
+    position_sizing:    str   = "fixed"
+    # ── Parámetros de simulación ──────────────────────────────────────────
+    fib_mode:           str   = "disabled"
+    compound:           bool  = True
+    vol_profile:        str   = "disabled"
+    max_trades_day:     int   = 0
+    tp_pct:             int   = 10
+    tp_atr:             float = 2.0
+    trailing_activation:  str   = "none"
+    trailing_progressive: bool  = False
+    atr_tp_adjust:      str   = "none"
+    time_exit:          str   = "none"
+    session_exit:       bool  = False
+    weekend_exit:       bool  = False
+    rr_min:             str   = "none"
 
 
 CONFIGS = [
@@ -1094,6 +1141,85 @@ def get_state() -> dict:
         "bots":           bots_data,
         "updated_at":     datetime.now().strftime("%H:%M:%S"),
     }
+
+
+def load_master_bots(json_path: str) -> list:
+    """Carga bots desde master_bots.json y devuelve lista de BotConfig."""
+    import json as _json
+    with open(json_path, "r", encoding="utf-8") as f:
+        bots_data = _json.load(f)
+    configs = []
+    for b in bots_data:
+        cfg = BotConfig(
+            name=b.get("name", "master_bot"),
+            label=b.get("label", "MASTER"),
+            interval=b.get("interval", "1h"),
+            ma_type=b.get("ma_type", "ema"),
+            ma_fast=b.get("ma_fast", 20),
+            ma_slow=b.get("ma_slow", 50),
+            trailing_pct=b.get("trailing_pct", 0.01),
+            min_vol_ratio=b.get("min_vol_ratio", 1.0),
+            sr_near_pct=b.get("sr_near_pct", 0.01),
+            fibo_zone_pct=b.get("fibo_zone_pct", 0.012),
+            candle_limit=b.get("candle_limit", 200),
+            leverage=b.get("leverage", 10),
+            risk_per_trade=b.get("risk_per_trade", b.get("risk_pct", 0.05)),
+            idx=b.get("idx", 0),
+            require_fib=b.get("require_fib", False),
+            require_sr=b.get("require_sr", False),
+            sl_type=b.get("sl_type", "trailing"),
+            direction=b.get("direction", "both"),
+            coins=b.get("coins", []),
+            tp_type=b.get("tp_type", "none"),
+            trailing_type=b.get("trailing_type", "none"),
+            macd_filter=b.get("macd_filter", "none"),
+            adx_filter=b.get("adx_filter", "none"),
+            supertrend_filter=b.get("supertrend_filter", "none"),
+            ichimoku_filter=b.get("ichimoku_filter", "none"),
+            stoch_rsi=b.get("stoch_rsi", "none"),
+            cci_filter=b.get("cci_filter", "none"),
+            williams_r=b.get("williams_r", "none"),
+            momentum_filter=b.get("momentum_filter", "none"),
+            bb_filter=b.get("bb_filter", "none"),
+            atr_volatility=b.get("atr_volatility", "none"),
+            keltner_filter=b.get("keltner_filter", "none"),
+            obv_filter=b.get("obv_filter", "none"),
+            vwap_filter=b.get("vwap_filter", "none"),
+            volume_delta=b.get("volume_delta", "none"),
+            cvd_filter=b.get("cvd_filter", "none"),
+            market_structure=b.get("market_structure", "none"),
+            breakout_range=b.get("breakout_range", "none"),
+            candle_pattern=b.get("candle_pattern", "none"),
+            order_block=b.get("order_block", "none"),
+            pivot_filter=b.get("pivot_filter", "none"),
+            sr_breakout=b.get("sr_breakout", "none"),
+            fib_retracement=b.get("fib_retracement", "none"),
+            rsi_divergence=b.get("rsi_divergence", "none"),
+            btc_correlation=b.get("btc_correlation", "none"),
+            funding_filter=b.get("funding_filter", "none"),
+            fear_greed_filter=b.get("fear_greed_filter", "none"),
+            session_filter=b.get("session_filter", "none"),
+            partial_close=b.get("partial_close", "none"),
+            partial_trigger=b.get("partial_trigger", "1atr"),
+            breakeven=b.get("breakeven", "none"),
+            min_confluences=b.get("min_confluences", 0),
+            position_sizing=b.get("position_sizing", "fixed"),
+            fib_mode=b.get("fib_mode", "disabled"),
+            compound=b.get("compound", True),
+            vol_profile=b.get("vol_profile", "disabled"),
+            max_trades_day=b.get("max_trades_day", 0),
+            tp_pct=b.get("tp_pct", 10),
+            tp_atr=b.get("tp_atr", 2.0),
+            trailing_activation=b.get("trailing_activation", "none"),
+            trailing_progressive=b.get("trailing_progressive", False),
+            atr_tp_adjust=b.get("atr_tp_adjust", "none"),
+            time_exit=b.get("time_exit", "none"),
+            session_exit=b.get("session_exit", False),
+            weekend_exit=b.get("weekend_exit", False),
+            rr_min=b.get("rr_min", "none"),
+        )
+        configs.append(cfg)
+    return configs
 
 
 def start() -> None:
