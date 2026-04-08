@@ -13,7 +13,7 @@ Uso:
                                [--workers N] [--resume]
 """
 
-import os, sys, json, time, random, argparse, hashlib, pickle
+import os, sys, json, time, random, math, argparse, hashlib, pickle
 import traceback, multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, asdict
@@ -25,7 +25,7 @@ import numpy as np
 import requests
 
 # ─── VERSIÓN Y CONSTANTES ─────────────────────────────────────────────────────
-VERSION        = "master_2.0.0"
+VERSION        = "master_3.0.0"
 INITIAL_EQUITY = 10_000.0
 HL_URL         = "https://api.hyperliquid.xyz/info"
 BINANCE_FUND   = "https://fapi.binance.com/fapi/v1/fundingRate"
@@ -37,7 +37,7 @@ TIMEFRAMES        = ["15m","30m","1h","2h","4h"]
 
 CHECKPOINT_EVERY = 25_000
 PRINT_TOP_EVERY  = 30_000
-MIN_TRADES_FILTER = 3   # mínimo de trades para incluir en rankings
+MIN_TRADES_FILTER = 20  # mínimo de trades para incluir en rankings
 
 # ─── OPCIONES DE PARÁMETROS (v5/v6/v7 — sin cambios) ─────────────────────────
 MA_PAIRS      = [("ema",8,21),("ema",13,34),("ema",21,55),("ema",20,50),
@@ -241,11 +241,13 @@ def random_params(rng: random.Random) -> OptParams:
         "session_filter": rng.choice(SESSION_FILT)
     }
     return OptParams(
-        interval=rng.choice(TIMEFRAMES), ma_type=ma[0], ma_fast=ma[1], ma_slow=ma[2],
+        interval=rng.choices(TIMEFRAMES, weights=[1, 1, 2, 3, 3])[0],
+        ma_type=ma[0], ma_fast=ma[1], ma_slow=ma[2],
         leverage=rng.choice(LEVERAGES), trailing_pct=rng.choice(TRAILING_PCTS),
         sl_type=rng.choice(SL_TYPES), fib_mode=rng.choice(FIB_MODES),
         rsi_filter=rng.choice(RSI_FILTERS), ema200_filter=rng.choice(EMA200_FILT),
-        atr_filter=rng.choice(ATR_FILTERS), compound=rng.choice(COMPOUNDS),
+        atr_filter=rng.choice(ATR_FILTERS),
+        compound=rng.choices([True, False], weights=[80, 20])[0],
         time_filter=rng.choice(TIME_FILTERS),
         vol_profile=rng.choice(VOL_PROFILES), liq_confirm=rng.choice(LIQ_CONFIRMS),
         risk_pct=rng.choice(RISK_PCTS),
@@ -1504,8 +1506,10 @@ def _worker_run_hc_segment(task: dict) -> List[dict]:
 def _score(r: dict) -> float:
     pnl_pct  = r.get("total_pnl_pct", 0.0)
     win_rate = r.get("win_rate", 0.0)
-    max_dd   = max(r.get("max_drawdown", 1.0), 0.01)
-    return (pnl_pct * win_rate) / max_dd
+    max_dd   = max(r.get("max_drawdown", 1.0), 1.0)
+    trades   = r.get("total_trades", 0)
+    trade_factor = math.log10(max(trades, 1)) / math.log10(10)  # 10t=1.0, 30t=1.48, 79t=1.90
+    return (pnl_pct * win_rate * trade_factor) / max_dd
 
 def _key(r: dict) -> str:
     p = {k: v for k, v in r.items() if k in _PARAM_FIELDS_SET}
@@ -1642,7 +1646,8 @@ def save_excel(out_dir: Path, all_results: List[dict],
     first = True
     for coin in MASTER_COINS:
         coin_data = coin_results.get(coin, [])
-        top30 = deduplicate(coin_data, top_n=30)
+        qualified = [r for r in coin_data if r.get("total_trades", 0) >= MIN_TRADES_FILTER]
+        top30 = sorted(qualified, key=lambda x: x.get("total_pnl_pct", 0), reverse=True)[:30]
         ws = wb.active if first else wb.create_sheet()
         first = False
         write_coin_sheet(ws, top30, coin)
