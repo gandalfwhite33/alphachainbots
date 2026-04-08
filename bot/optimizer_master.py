@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
 optimizer_master.py — Optimizador maestro multi-moneda y multi-dirección.
-Prueba 10 monedas × 3 direcciones en un solo run de 2M muestras.
+Prueba 10 monedas × 3 direcciones en un solo run de 6M muestras.
 Todos los parámetros de entrada y salida de v7 conservados.
 
 Genera:
-  master_results.xlsx  — tabs por moneda + RANKING_GLOBAL + RECOMENDADOS
-  master_bots.json     — top 20 listos para importar a sim_engine.py
+  master_results.xlsx  — tabs por moneda + TOP_PNL + TOP_CONSISTENCIA + RECOMENDADOS_PITCH + RECOMENDADOS_LIVE
+  master_bots.json     — top 30 listos para importar a sim_engine.py
 
 Uso:
-    python optimizer_master.py [--samples 2000000] [--out ../resultados_master]
+    python optimizer_master.py [--samples 6000000] [--out ../resultados_master]
                                [--workers N] [--resume]
 """
 
@@ -37,7 +37,7 @@ TIMEFRAMES        = ["15m","30m","1h","2h","4h"]
 
 CHECKPOINT_EVERY = 25_000
 PRINT_TOP_EVERY  = 30_000
-MIN_TRADES_FILTER = 10  # mínimo de trades para incluir en rankings
+MIN_TRADES_FILTER = 3   # mínimo de trades para incluir en rankings
 
 # ─── OPCIONES DE PARÁMETROS (v5/v6/v7 — sin cambios) ─────────────────────────
 MA_PAIRS      = [("ema",8,21),("ema",13,34),("ema",21,55),("ema",20,50),
@@ -240,12 +240,6 @@ def random_params(rng: random.Random) -> OptParams:
         "funding_filter": rng.choice(FUNDING_FILT), "fear_greed_filter": rng.choice(FNG_FILTERS),
         "session_filter": rng.choice(SESSION_FILT)
     }
-    _active = [k for k, v in _filter_vals.items() if v != "none"]
-    if len(_active) > 5:
-        _to_disable = rng.sample(_active, len(_active) - 5)
-        for k in _to_disable:
-            _filter_vals[k] = "none"
-
     return OptParams(
         interval=rng.choice(TIMEFRAMES), ma_type=ma[0], ma_fast=ma[1], ma_slow=ma[2],
         leverage=rng.choice(LEVERAGES), trailing_pct=rng.choice(TRAILING_PCTS),
@@ -1510,7 +1504,7 @@ def _worker_run_hc_segment(task: dict) -> List[dict]:
 def _score(r: dict) -> float:
     pnl_pct  = r.get("total_pnl_pct", 0.0)
     win_rate = r.get("win_rate", 0.0)
-    max_dd   = max(r.get("max_drawdown", 1.0), 1.0)
+    max_dd   = max(r.get("max_drawdown", 1.0), 0.01)
     return (pnl_pct * win_rate) / max_dd
 
 def _key(r: dict) -> str:
@@ -1653,22 +1647,43 @@ def save_excel(out_dir: Path, all_results: List[dict],
         first = False
         write_coin_sheet(ws, top30, coin)
 
-    # RANKING_GLOBAL: top 100 por Sharpe, min 8 trades
-    global_top100 = deduplicate(all_results, top_n=100)
-    ws_global = wb.create_sheet()
-    write_global_sheet(ws_global, global_top100, "RANKING_GLOBAL")
+    # TOP_PNL: top 100 ordenados por PnL% puro
+    top_pnl = sorted([r for r in all_results if r.get("total_trades", 0) >= MIN_TRADES_FILTER],
+                      key=lambda x: x.get("total_pnl_pct", 0), reverse=True)[:100]
+    ws_pnl = wb.create_sheet()
+    write_global_sheet(ws_pnl, top_pnl, "TOP_PNL")
 
-    # RECOMENDADOS: top 20 sin repetir (coin, direction, interval)
-    seen_cdt: set = set()
+    # TOP_CONSISTENCIA: top 100 ordenados por _score (PnL*WR/DD)
+    top_consist = sorted([r for r in all_results if r.get("total_trades", 0) >= MIN_TRADES_FILTER],
+                         key=lambda x: _score(x), reverse=True)[:100]
+    ws_consist = wb.create_sheet()
+    write_global_sheet(ws_consist, top_consist, "TOP_CONSISTENCIA")
+
+    # RECOMENDADOS_PITCH: top 30 por PnL%, sin repetir (coin, direction, interval)
+    # Para demos a clientes — máximo impacto visual
+    seen_pitch: set = set()
+    pitch: List[dict] = []
+    for r in sorted(all_results, key=lambda x: x.get("total_pnl_pct", 0), reverse=True):
+        if r.get("total_trades", 0) < MIN_TRADES_FILTER: continue
+        cdt = (r.get("coin",""), r.get("direction",""), r.get("interval",""))
+        if cdt not in seen_pitch:
+            seen_pitch.add(cdt); pitch.append(r)
+            if len(pitch) >= 30: break
+    ws_pitch = wb.create_sheet()
+    write_global_sheet(ws_pitch, pitch, "RECOMENDADOS_PITCH")
+
+    # RECOMENDADOS_LIVE: top 30 por _score, sin repetir (coin, direction, interval)
+    # Para uso en producción — balance entre PnL, WR y drawdown
+    seen_live: set = set()
     recommended: List[dict] = []
     for r in sorted(all_results, key=lambda x: _score(x), reverse=True):
         if r.get("total_trades", 0) < MIN_TRADES_FILTER: continue
         cdt = (r.get("coin",""), r.get("direction",""), r.get("interval",""))
-        if cdt not in seen_cdt:
-            seen_cdt.add(cdt); recommended.append(r)
-            if len(recommended) >= 20: break
-    ws_rec = wb.create_sheet()
-    write_global_sheet(ws_rec, recommended, "RECOMENDADOS")
+        if cdt not in seen_live:
+            seen_live.add(cdt); recommended.append(r)
+            if len(recommended) >= 30: break
+    ws_live = wb.create_sheet()
+    write_global_sheet(ws_live, recommended, "RECOMENDADOS_LIVE")
 
     out_path = out_dir / "master_results.xlsx"
     try:
@@ -1682,9 +1697,9 @@ def save_excel(out_dir: Path, all_results: List[dict],
 
 # ─── JSON BOTS ────────────────────────────────────────────────────────────────
 def save_master_bots(out_dir: Path, recommended: List[dict]):
-    """Genera master_bots.json con los 20 bots listos para sim_engine.py."""
+    """Genera master_bots.json con los 30 bots listos para sim_engine.py."""
     bots = []
-    for i, r in enumerate(recommended[:20]):
+    for i, r in enumerate(recommended[:30]):
         coin = r.get("coin", "BTC")
         direction = r.get("direction", "both")
         interval  = r.get("interval", "1h")
@@ -1788,7 +1803,7 @@ def print_summary(all_results: List[dict], coin_results: Dict[str, list],
     print(sep)
     print(f"  Monedas: {', '.join(MASTER_COINS)}")
     print(f"  Combinaciones: {total_tried:,}  |  Duracion: {duration_sec/60:.1f} min")
-    print(f"\n  RECOMENDADOS (top 20 sin duplicar moneda/dir/TF, min {MIN_TRADES_FILTER} trades):")
+    print(f"\n  RECOMENDADOS_LIVE (top 30 sin duplicar moneda/dir/TF, min {MIN_TRADES_FILTER} trades):")
     print(f"  {'#':>2}  {'Coin':>5}  {'Dir':>6}  {'TF':>4}  {'MA':>14}  "
           f"{'Lev':>4}  {'PnL%':>7}  {'WR%':>5}  {'T':>4}  {'Sharpe':>7}")
     print(f"  {'-'*84}")
@@ -1832,7 +1847,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="AlphaChainBots Optimizer Master")
     parser.add_argument("--days",    type=int, default=365,       help="Dias de historial")
-    parser.add_argument("--samples", type=int, default=2_000_000, help="Combinaciones totales")
+    parser.add_argument("--samples", type=int, default=6_000_000, help="Combinaciones totales")
     parser.add_argument("--out",     type=str, default=None,      help="Directorio de salida")
     parser.add_argument("--workers", type=int, default=None,      help="Workers paralelos")
     parser.add_argument("--resume",  action="store_true",         help="Reanudar desde checkpoint")
