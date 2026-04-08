@@ -25,7 +25,7 @@ import numpy as np
 import requests
 
 # ─── VERSIÓN Y CONSTANTES ─────────────────────────────────────────────────────
-VERSION        = "master_1.0.0"
+VERSION        = "master_2.0.0"
 INITIAL_EQUITY = 10_000.0
 HL_URL         = "https://api.hyperliquid.xyz/info"
 BINANCE_FUND   = "https://fapi.binance.com/fapi/v1/fundingRate"
@@ -37,7 +37,7 @@ TIMEFRAMES        = ["15m","30m","1h","2h","4h"]
 
 CHECKPOINT_EVERY = 25_000
 PRINT_TOP_EVERY  = 30_000
-MIN_TRADES_FILTER = 8   # mínimo de trades para incluir en rankings
+MIN_TRADES_FILTER = 30  # mínimo de trades para incluir en rankings
 
 # ─── OPCIONES DE PARÁMETROS (v5/v6/v7 — sin cambios) ─────────────────────────
 MA_PAIRS      = [("ema",8,21),("ema",13,34),("ema",21,55),("ema",20,50),
@@ -213,6 +213,39 @@ class OptParams:
 
 def random_params(rng: random.Random) -> OptParams:
     ma = rng.choice(MA_PAIRS)
+
+    # Limitar filtros activos a máximo 5
+    _filter_keys = [
+        "macd_filter","adx_filter","supertrend_filter","ichimoku_filter",
+        "stoch_rsi","cci_filter","williams_r","momentum_filter","bb_filter",
+        "atr_volatility","keltner_filter","obv_filter","vwap_filter",
+        "volume_delta","cvd_filter","market_structure","breakout_range",
+        "candle_pattern","order_block","pivot_filter","sr_breakout",
+        "fib_retracement","rsi_divergence","btc_correlation","funding_filter",
+        "fear_greed_filter","session_filter"
+    ]
+    _filter_vals = {
+        "macd_filter": rng.choice(MACD_FILTERS), "adx_filter": rng.choice(ADX_FILTERS),
+        "supertrend_filter": rng.choice(ST_FILTERS), "ichimoku_filter": rng.choice(ICHI_FILTERS),
+        "stoch_rsi": rng.choice(STOCH_RSI), "cci_filter": rng.choice(CCI_FILTERS),
+        "williams_r": rng.choice(WILLIAMS_R), "momentum_filter": rng.choice(MOM_FILTERS),
+        "bb_filter": rng.choice(BB_FILTERS), "atr_volatility": rng.choice(ATR_VOL),
+        "keltner_filter": rng.choice(KELT_FILTERS), "obv_filter": rng.choice(OBV_FILTERS),
+        "vwap_filter": rng.choice(VWAP_FILTERS), "volume_delta": rng.choice(VOL_DELTA),
+        "cvd_filter": rng.choice(CVD_FILTERS), "market_structure": rng.choice(MKT_STRUCT),
+        "breakout_range": rng.choice(BREAKOUT_RANGE), "candle_pattern": rng.choice(CANDLE_PAT),
+        "order_block": rng.choice(ORDER_BLOCK), "pivot_filter": rng.choice(PIVOT_FILTERS),
+        "sr_breakout": rng.choice(SR_BREAKOUT), "fib_retracement": rng.choice(FIB_RET),
+        "rsi_divergence": rng.choice(RSI_DIV), "btc_correlation": rng.choice(BTC_CORR),
+        "funding_filter": rng.choice(FUNDING_FILT), "fear_greed_filter": rng.choice(FNG_FILTERS),
+        "session_filter": rng.choice(SESSION_FILT)
+    }
+    _active = [k for k, v in _filter_vals.items() if v != "none"]
+    if len(_active) > 5:
+        _to_disable = rng.sample(_active, len(_active) - 5)
+        for k in _to_disable:
+            _filter_vals[k] = "none"
+
     return OptParams(
         interval=rng.choice(TIMEFRAMES), ma_type=ma[0], ma_fast=ma[1], ma_slow=ma[2],
         leverage=rng.choice(LEVERAGES), trailing_pct=rng.choice(TRAILING_PCTS),
@@ -222,20 +255,21 @@ def random_params(rng: random.Random) -> OptParams:
         time_filter=rng.choice(TIME_FILTERS),
         vol_profile=rng.choice(VOL_PROFILES), liq_confirm=rng.choice(LIQ_CONFIRMS),
         risk_pct=rng.choice(RISK_PCTS),
-        macd_filter=rng.choice(MACD_FILTERS), adx_filter=rng.choice(ADX_FILTERS),
-        supertrend_filter=rng.choice(ST_FILTERS), ichimoku_filter=rng.choice(ICHI_FILTERS),
-        stoch_rsi=rng.choice(STOCH_RSI), cci_filter=rng.choice(CCI_FILTERS),
-        williams_r=rng.choice(WILLIAMS_R), momentum_filter=rng.choice(MOM_FILTERS),
-        bb_filter=rng.choice(BB_FILTERS), atr_volatility=rng.choice(ATR_VOL),
-        keltner_filter=rng.choice(KELT_FILTERS), obv_filter=rng.choice(OBV_FILTERS),
-        vwap_filter=rng.choice(VWAP_FILTERS), volume_delta=rng.choice(VOL_DELTA),
-        cvd_filter=rng.choice(CVD_FILTERS), market_structure=rng.choice(MKT_STRUCT),
-        breakout_range=rng.choice(BREAKOUT_RANGE), candle_pattern=rng.choice(CANDLE_PAT),
-        order_block=rng.choice(ORDER_BLOCK), pivot_filter=rng.choice(PIVOT_FILTERS),
-        sr_breakout=rng.choice(SR_BREAKOUT), fib_retracement=rng.choice(FIB_RET),
-        rsi_divergence=rng.choice(RSI_DIV), btc_correlation=rng.choice(BTC_CORR),
-        funding_filter=rng.choice(FUNDING_FILT), fear_greed_filter=rng.choice(FNG_FILTERS),
-        session_filter=rng.choice(SESSION_FILT), position_sizing=rng.choice(POS_SIZING),
+        macd_filter=_filter_vals["macd_filter"], adx_filter=_filter_vals["adx_filter"],
+        supertrend_filter=_filter_vals["supertrend_filter"], ichimoku_filter=_filter_vals["ichimoku_filter"],
+        stoch_rsi=_filter_vals["stoch_rsi"], cci_filter=_filter_vals["cci_filter"],
+        williams_r=_filter_vals["williams_r"], momentum_filter=_filter_vals["momentum_filter"],
+        bb_filter=_filter_vals["bb_filter"], atr_volatility=_filter_vals["atr_volatility"],
+        keltner_filter=_filter_vals["keltner_filter"], obv_filter=_filter_vals["obv_filter"],
+        vwap_filter=_filter_vals["vwap_filter"], volume_delta=_filter_vals["volume_delta"],
+        cvd_filter=_filter_vals["cvd_filter"], market_structure=_filter_vals["market_structure"],
+        breakout_range=_filter_vals["breakout_range"], candle_pattern=_filter_vals["candle_pattern"],
+        order_block=_filter_vals["order_block"], pivot_filter=_filter_vals["pivot_filter"],
+        sr_breakout=_filter_vals["sr_breakout"], fib_retracement=_filter_vals["fib_retracement"],
+        rsi_divergence=_filter_vals["rsi_divergence"], btc_correlation=_filter_vals["btc_correlation"],
+        funding_filter=_filter_vals["funding_filter"], fear_greed_filter=_filter_vals["fear_greed_filter"],
+        session_filter=_filter_vals["session_filter"],
+        position_sizing=rng.choice(POS_SIZING),
         max_trades_day=rng.choice(MAX_TRADES_DAY), trailing_type=rng.choice(TRAIL_TYPES),
         min_confluences=rng.choice(MIN_CONF),
         tp_type=rng.choice(TP_TYPES), tp_pct=rng.choice(TP_PCT_OPTS),
@@ -1415,10 +1449,10 @@ def _worker_run_hc_segment(task: dict) -> List[dict]:
 
 # ─── SCORING Y DEDUPLICACIÓN ──────────────────────────────────────────────────
 def _score(r: dict) -> float:
-    pnl_pct  = r.get("total_pnl_pct", 0.0)
-    win_rate = r.get("win_rate", 0.0)
-    max_dd   = max(r.get("max_drawdown", 1.0), 1.0)
-    return (pnl_pct * win_rate) / max_dd
+    trades  = max(r.get("total_trades", 0), 1)
+    sharpe  = r.get("sharpe", 0.0)
+    max_dd  = max(r.get("max_drawdown", 0.01), 0.01)
+    return sharpe * (trades ** 0.5) / (1 + max_dd)
 
 def _key(r: dict) -> str:
     p = {k: v for k, v in r.items() if k in _PARAM_FIELDS_SET}
@@ -1427,7 +1461,7 @@ def _key(r: dict) -> str:
 def deduplicate(results: List[dict], top_n: int = 30,
                 min_trades: int = MIN_TRADES_FILTER) -> List[dict]:
     seen = set(); unique = []
-    for r in sorted(results, key=lambda x: x.get("sharpe", 0.0), reverse=True):
+    for r in sorted(results, key=lambda x: _score(x), reverse=True):
         if r.get("total_trades", 0) < min_trades: continue
         k = _key(r)
         if k not in seen:
@@ -1451,8 +1485,8 @@ def save_checkpoint(path: Path, processed: int,
                     results: List[dict], coin_results: Dict[str, list]):
     data = {
         "processed":     processed,
-        "results":       sorted(results, key=lambda x: x.get("sharpe", 0), reverse=True)[:5000],
-        "coin_results":  {c: sorted(r, key=lambda x: x.get("sharpe", 0), reverse=True)[:300]
+        "results":       sorted(results, key=lambda x: _score(x), reverse=True)[:5000],
+        "coin_results":  {c: sorted(r, key=lambda x: _score(x), reverse=True)[:300]
                           for c, r in coin_results.items()},
         "timestamp":     datetime.now().isoformat(),
     }
@@ -1568,7 +1602,7 @@ def save_excel(out_dir: Path, all_results: List[dict],
     # RECOMENDADOS: top 20 sin repetir (coin, direction, interval)
     seen_cdt: set = set()
     recommended: List[dict] = []
-    for r in sorted(all_results, key=lambda x: x.get("sharpe", 0.0), reverse=True):
+    for r in sorted(all_results, key=lambda x: _score(x), reverse=True):
         if r.get("total_trades", 0) < MIN_TRADES_FILTER: continue
         cdt = (r.get("coin",""), r.get("direction",""), r.get("interval",""))
         if cdt not in seen_cdt:
@@ -1812,7 +1846,7 @@ def main():
 
             if processed - last_top_print >= PRINT_TOP_EVERY:
                 last_top_print = processed
-                top5 = [r for r in sorted(all_results, key=lambda x: x.get("sharpe", 0), reverse=True)
+                top5 = [r for r in sorted(all_results, key=lambda x: _score(x), reverse=True)
                         if r.get("total_trades", 0) >= MIN_TRADES_FILTER][:5]
                 print(f"\n[{ts()}] Top 5 (Sharpe, min {MIN_TRADES_FILTER} trades):")
                 for i, r in enumerate(top5):
@@ -1835,7 +1869,7 @@ def main():
     # ── Hill climbing ─────────────────────────────────────────────────────────
     qualified = [r for r in all_results if r.get("total_trades", 0) >= MIN_TRADES_FILTER]
     if qualified:
-        sorted_q = sorted(qualified, key=lambda x: x.get("sharpe", 0), reverse=True)
+        sorted_q = sorted(qualified, key=lambda x: _score(x), reverse=True)
         n_seeds  = max(1, min(len(sorted_q) // 5, 2000))
         n_hc     = min(n_seeds * 8, 50_000)
         print(f"[{ts()}] Hill climbing: {n_seeds} semillas x 8 = {n_hc:,} intentos…")
