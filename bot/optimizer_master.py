@@ -37,7 +37,7 @@ TIMEFRAMES        = ["15m","30m","1h","2h","4h"]
 
 CHECKPOINT_EVERY = 25_000
 PRINT_TOP_EVERY  = 30_000
-MIN_TRADES_FILTER = 30  # mínimo de trades para incluir en rankings
+MIN_TRADES_FILTER = 10  # mínimo de trades para incluir en rankings
 
 # ─── OPCIONES DE PARÁMETROS (v5/v6/v7 — sin cambios) ─────────────────────────
 MA_PAIRS      = [("ema",8,21),("ema",13,34),("ema",21,55),("ema",20,50),
@@ -327,9 +327,56 @@ def perturb(p: OptParams, rng: random.Random) -> OptParams:
 
 
 # ─── CANDLE FETCHING ──────────────────────────────────────────────────────────
+_INTERVAL_MS = {
+    "15m": 900_000, "30m": 1_800_000, "1h": 3_600_000,
+    "2h": 7_200_000, "4h": 14_400_000,
+}
+_HL_MAX_CANDLES = 5000  # Hyperliquid max per request
+
+
 def _fetch_hl(coin: str, interval: str, days: int) -> Optional[np.ndarray]:
+    """Fetch candles with backward pagination when API returns max (5000) candles."""
     end_ms   = int(time.time() * 1000)
     start_ms = end_ms - days * 86_400_000
+    iv_ms    = _INTERVAL_MS.get(interval, 3_600_000)
+
+    # First request: get latest data
+    arr = _fetch_hl_single(coin, interval, start_ms, end_ms)
+    if arr is None or len(arr) < 50:
+        return arr
+
+    # If we got less than max, API has no more data
+    if len(arr) < _HL_MAX_CANDLES:
+        return arr
+
+    # Got exactly max — paginate backward to get older data
+    all_rows = [arr]
+    oldest_ts = int(arr[0, 0])
+
+    while oldest_ts > start_ms:
+        chunk_end = oldest_ts - 1  # just before current oldest
+        chunk = _fetch_hl_single(coin, interval, start_ms, chunk_end)
+        if chunk is None or len(chunk) == 0:
+            break
+        all_rows.append(chunk)
+        new_oldest = int(chunk[0, 0])
+        if new_oldest >= oldest_ts:
+            break  # no progress
+        oldest_ts = new_oldest
+        time.sleep(0.1)
+
+    if len(all_rows) == 1:
+        return arr
+
+    combined = np.concatenate(all_rows, axis=0)
+    _, idx = np.unique(combined[:, 0], return_index=True)
+    combined = combined[np.sort(idx)]
+    return combined if len(combined) > 50 else None
+
+
+def _fetch_hl_single(coin: str, interval: str,
+                     start_ms: int, end_ms: int) -> Optional[np.ndarray]:
+    """Single API call to Hyperliquid candleSnapshot."""
     try:
         r = requests.post(HL_URL, json={
             "type": "candleSnapshot",
@@ -1461,10 +1508,10 @@ def _worker_run_hc_segment(task: dict) -> List[dict]:
 
 # ─── SCORING Y DEDUPLICACIÓN ──────────────────────────────────────────────────
 def _score(r: dict) -> float:
-    trades  = max(r.get("total_trades", 0), 1)
-    sharpe  = r.get("sharpe", 0.0)
-    max_dd  = max(r.get("max_drawdown", 0.01), 0.01)
-    return sharpe * (trades ** 0.5) / (1 + max_dd)
+    pnl_pct  = r.get("total_pnl_pct", 0.0)
+    win_rate = r.get("win_rate", 0.0)
+    max_dd   = max(r.get("max_drawdown", 1.0), 1.0)
+    return (pnl_pct * win_rate) / max_dd
 
 def _key(r: dict) -> str:
     p = {k: v for k, v in r.items() if k in _PARAM_FIELDS_SET}

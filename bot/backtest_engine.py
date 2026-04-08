@@ -79,11 +79,17 @@ def _fetch_external_data():
 
 # ── CANDLE FETCH ──────────────────────────────────────────────────────────────
 
-def _fetch_candles(coin: str, interval: str, days: int) -> list:
-    """Fetch historical OHLCV candles from Hyperliquid. Returns list of dicts."""
+_BT_INTERVAL_MS = {
+    "15m": 900_000, "30m": 1_800_000, "1h": 3_600_000,
+    "2h": 7_200_000, "4h": 14_400_000,
+}
+_BT_MAX_CANDLES = 5000
+
+
+def _fetch_candles_single(coin: str, interval: str,
+                          start_ms: int, end_ms: int) -> list:
+    """Single API call to Hyperliquid."""
     try:
-        end_ms   = int(time.time() * 1000)
-        start_ms = end_ms - int(days * 86_400_000)
         r = requests.post(HL_URL, json={
             "type": "candleSnapshot",
             "req": {"coin": coin, "interval": interval,
@@ -105,10 +111,52 @@ def _fetch_candles(coin: str, interval: str, days: int) -> list:
                 })
             except (TypeError, ValueError):
                 pass
-        return sorted(out, key=lambda x: x["t"])
+        return out
     except Exception as e:
-        log.warning(f"_fetch_candles {coin}/{interval}/{days}d: {e}")
+        log.warning(f"_fetch_candles_single {coin}/{interval}: {e}")
         return []
+
+
+def _fetch_candles(coin: str, interval: str, days: int) -> list:
+    """Fetch historical OHLCV candles with backward pagination when >5000 available."""
+    end_ms   = int(time.time() * 1000)
+    start_ms = end_ms - int(days * 86_400_000)
+
+    # First request: get latest data
+    result = _fetch_candles_single(coin, interval, start_ms, end_ms)
+    if not result:
+        return []
+
+    result = sorted(result, key=lambda x: x["t"])
+
+    # If less than max, API has no more data
+    if len(result) < _BT_MAX_CANDLES:
+        return result
+
+    # Paginate backward to get older data
+    all_candles = list(result)
+    oldest_ts = result[0]["t"]
+
+    while oldest_ts > start_ms:
+        chunk_end = oldest_ts - 1
+        chunk = _fetch_candles_single(coin, interval, start_ms, chunk_end)
+        if not chunk:
+            break
+        all_candles.extend(chunk)
+        new_oldest = min(c["t"] for c in chunk)
+        if new_oldest >= oldest_ts:
+            break
+        oldest_ts = new_oldest
+        time.sleep(0.1)
+
+    # Deduplicate by timestamp
+    seen_ts = set()
+    unique = []
+    for c in sorted(all_candles, key=lambda x: x["t"]):
+        if c["t"] not in seen_ts:
+            seen_ts.add(c["t"])
+            unique.append(c)
+    return unique
 
 
 def _fetch_candles_cached(coin: str, interval: str, days: int) -> list:
