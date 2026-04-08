@@ -37,8 +37,18 @@ BT_INTERVAL_MAP = {
     "1h": "1h", "2h": "2h", "4h": "4h",
 }
 
-# ── EXTERNAL DATA CACHE ──────────────────────────────────────────────────────
+# ── CACHES ───────────────────────────────────────────────────────────────────
 _ext_cache = {"fng": None, "funding": None, "ts": 0}
+
+# Indicator cache: key = "COIN_interval", value = ind dict
+_INDICATOR_CACHE: dict = {}
+_IND_CACHE_TS: dict = {}  # key -> timestamp when cached
+_IND_CACHE_TTL = 4 * 3600  # 4 hours
+
+# Candles cache: key = "COIN_interval_days", value = candles list
+_CANDLES_CACHE: dict = {}
+_CANDLES_CACHE_TS: dict = {}
+_CANDLES_CACHE_TTL = 4 * 3600  # 4 hours
 
 
 def _fetch_external_data():
@@ -99,6 +109,18 @@ def _fetch_candles(coin: str, interval: str, days: int) -> list:
     except Exception as e:
         log.warning(f"_fetch_candles {coin}/{interval}/{days}d: {e}")
         return []
+
+
+def _fetch_candles_cached(coin: str, interval: str, days: int) -> list:
+    """Fetch candles with 4-hour cache."""
+    key = f"{coin}_{interval}_{days}"
+    now = time.time()
+    if key in _CANDLES_CACHE and (now - _CANDLES_CACHE_TS.get(key, 0)) < _CANDLES_CACHE_TTL:
+        return _CANDLES_CACHE[key]
+    result = _fetch_candles(coin, interval, days)
+    _CANDLES_CACHE[key] = result
+    _CANDLES_CACHE_TS[key] = now
+    return result
 
 
 # ── LIST-BASED INDICATORS (para _bt_liq backward compat) ─────────────────────
@@ -213,7 +235,56 @@ def _downsample(snaps: list, target: int) -> list:
 
 # ── INDICADORES PARA UNA MONEDA (idéntico al optimizer) ──────────────────────
 
-def _compute_indicators(candles_list: list, btc_candles_list: list = None) -> dict:
+def _divergence_vectorized(closes, indicator, lb=14):
+    """Vectorized divergence detection — replaces Python loop."""
+    n = len(closes)
+    bull = np.zeros(n, dtype=bool)
+    bear = np.zeros(n, dtype=bool)
+    if n < lb * 2:
+        return bull, bear
+
+    # Build rolling min/max using stride tricks for the lookback window
+    from numpy.lib.stride_tricks import sliding_window_view
+    if n < lb:
+        return bull, bear
+
+    c_win = sliding_window_view(closes[:n], lb)  # shape (n-lb+1, lb)
+    i_win = sliding_window_view(indicator[:n], lb)
+
+    # Check for NaN in indicator windows
+    i_has_nan = np.any(np.isnan(i_win), axis=1)
+    c_has_nan = np.any(np.isnan(c_win), axis=1)
+    valid = ~(i_has_nan | c_has_nan)
+
+    lo_c = np.nanmin(c_win, axis=1)
+    hi_c = np.nanmax(c_win, axis=1)
+    lo_i = np.nanmin(i_win, axis=1)
+    hi_i = np.nanmax(i_win, axis=1)
+
+    # Window index i corresponds to closes[i+lb-1] being the current bar
+    # We want range(lb*2, n) so offset = lb*2 - lb = lb
+    start = lb  # offset in windowed arrays for i >= lb*2
+    end = n - lb + 1  # total windows
+
+    if start >= end:
+        return bull, bear
+
+    sl = slice(start, end)
+    bar_idx = np.arange(start + lb - 1, end + lb - 1)  # actual bar indices
+
+    v = valid[sl]
+    cur_c = closes[bar_idx]
+    cur_i = indicator[bar_idx]
+
+    bull_mask = v & (cur_c <= lo_c[sl]) & (cur_i > lo_i[sl])
+    bear_mask = v & (cur_c >= hi_c[sl]) & (cur_i < hi_i[sl])
+
+    bull[bar_idx[bull_mask]] = True
+    bear[bar_idx[bear_mask]] = True
+    return bull, bear
+
+
+def _compute_indicators_raw(candles_list: list, btc_candles_list: list = None) -> dict:
     """Construye dict de indicadores idéntico a optimizer_master._worker_init."""
     arr = np.array([[c["t"], c["o"], c["h"], c["l"], c["c"], c["v"]]
                     for c in candles_list], dtype=np.float64)
@@ -231,21 +302,9 @@ def _compute_indicators(candles_list: list, btc_candles_list: list = None) -> di
     roll_lo = _opt._roll_min(lows, 60)
 
     macd_l, macd_s, macd_h = _opt._macd(closes)
-    lb = 14
-    macd_bull_div = np.zeros(len(closes), dtype=bool)
-    macd_bear_div = np.zeros(len(closes), dtype=bool)
-    for i in range(lb * 2, len(closes)):
-        if macd_h[i] != macd_h[i]:
-            continue
-        sl_c = closes[i - lb:i]; sl_mh = macd_h[i - lb:i]
-        lo_c = _opt._safe_nanmin(sl_c); hi_c = _opt._safe_nanmax(sl_c)
-        lo_mh = _opt._safe_nanmin(sl_mh); hi_mh = _opt._safe_nanmax(sl_mh)
-        if np.isnan(lo_c) or np.isnan(hi_c) or np.isnan(lo_mh) or np.isnan(hi_mh):
-            continue
-        if closes[i] <= lo_c and macd_h[i] > lo_mh:
-            macd_bull_div[i] = True
-        if closes[i] >= hi_c and macd_h[i] < hi_mh:
-            macd_bear_div[i] = True
+
+    # Vectorized divergence detection (replaces Python loops)
+    macd_bull_div, macd_bear_div = _divergence_vectorized(closes, macd_h, 14)
 
     adx = _opt._adx(highs, lows, closes)
     st = _opt._supertrend(highs, lows, closes)
@@ -262,18 +321,8 @@ def _compute_indicators(candles_list: list, btc_candles_list: list = None) -> di
     obv_arr = _opt._obv(closes, volumes)
     obv_ema = _opt._ema(obv_arr, 20)
 
-    obv_bull_div = np.zeros(len(closes), dtype=bool)
-    obv_bear_div = np.zeros(len(closes), dtype=bool)
-    for i in range(lb * 2, len(closes)):
-        sl_c = closes[i - lb:i]; sl_o = obv_arr[i - lb:i]
-        lo_c = _opt._safe_nanmin(sl_c); hi_c = _opt._safe_nanmax(sl_c)
-        lo_o = _opt._safe_nanmin(sl_o); hi_o = _opt._safe_nanmax(sl_o)
-        if np.isnan(lo_c) or np.isnan(hi_c) or np.isnan(lo_o) or np.isnan(hi_o):
-            continue
-        if closes[i] <= lo_c and obv_arr[i] > lo_o:
-            obv_bull_div[i] = True
-        if closes[i] >= hi_c and obv_arr[i] < hi_o:
-            obv_bear_div[i] = True
+    # Vectorized OBV divergence
+    obv_bull_div, obv_bear_div = _divergence_vectorized(closes, obv_arr, 14)
 
     vwap_arr = _opt._vwap_daily(ts_col, highs, lows, closes, volumes)
     cvd_arr = _opt._cvd(opens, closes, volumes)
@@ -351,6 +400,23 @@ def _compute_indicators(candles_list: list, btc_candles_list: list = None) -> di
         fn = _opt._ema if ma_type == "ema" else _opt._sma
         ind[f"maf_{k}"] = fn(closes, fast)
         ind[f"mas_{k}"] = fn(closes, slow)
+
+    return ind
+
+
+def _compute_indicators(candles_list: list, btc_candles_list: list = None,
+                        cache_key: str = None) -> dict:
+    """Wrapper con caché de 4 horas sobre _compute_indicators_raw."""
+    if cache_key:
+        now = time.time()
+        if cache_key in _INDICATOR_CACHE and (now - _IND_CACHE_TS.get(cache_key, 0)) < _IND_CACHE_TTL:
+            return _INDICATOR_CACHE[cache_key]
+
+    ind = _compute_indicators_raw(candles_list, btc_candles_list)
+
+    if cache_key and ind is not None:
+        _INDICATOR_CACHE[cache_key] = ind
+        _IND_CACHE_TS[cache_key] = time.time()
 
     return ind
 
@@ -465,8 +531,8 @@ def _bt_crossover(cfg, candles_cache: dict, days: int,
             btc_key = f"BTC_{bt_interval}"
             btc_candles = candles_cache.get(btc_key)
 
-        # Calcular indicadores (idéntico al optimizer)
-        ind = _compute_indicators(df, btc_candles)
+        # Calcular indicadores con caché
+        ind = _compute_indicators(df, btc_candles, cache_key=key)
         if ind is None:
             continue
 
@@ -633,6 +699,56 @@ def _build_result(events: list, trades: list, days: int) -> dict:
     return _compute_metrics(snaps, trades, INITIAL_EQUITY, days)
 
 
+# ── PRECÁLCULO AL ARRANCAR ───────────────────────────────────────────────────
+
+_PRECALC_COINS = ["BTC", "ETH", "SOL"]
+_PRECALC_INTERVALS = ["15m", "30m", "1h", "2h", "4h"]
+_PRECALC_DAYS = 365  # max period
+
+
+def precalculate_indicators():
+    """Pre-calcula indicadores para combinaciones comunes de coin × interval.
+    Llamar al arrancar el servidor para que el primer backtest sea instantáneo."""
+    log.info("[BT] Pre-calculating indicators for %d combos...",
+             len(_PRECALC_COINS) * len(_PRECALC_INTERVALS))
+    t0 = time.time()
+    for coin in _PRECALC_COINS:
+        for iv in _PRECALC_INTERVALS:
+            try:
+                candles = _fetch_candles_cached(coin, iv, _PRECALC_DAYS)
+                if len(candles) < 250:
+                    continue
+                key = f"{coin}_{iv}"
+                # BTC candles for btc_correlation (skip if already BTC)
+                btc_candles = None
+                if coin != "BTC":
+                    btc_candles = _fetch_candles_cached("BTC", iv, _PRECALC_DAYS)
+                _compute_indicators(candles, btc_candles, cache_key=key)
+                time.sleep(0.05)
+            except Exception as e:
+                log.warning(f"[BT] Precalc failed {coin}/{iv}: {e}")
+    elapsed = time.time() - t0
+    log.info(f"[BT] Pre-calculation done in {elapsed:.1f}s, "
+             f"cached {len(_INDICATOR_CACHE)} indicator sets")
+
+
+def precalculate_indicators_bg():
+    """Lanza precálculo en background thread."""
+    t = threading.Thread(target=precalculate_indicators, daemon=True,
+                         name="bt_precalc")
+    t.start()
+    return t
+
+
+def invalidate_caches():
+    """Forzar invalidación de todos los cachés."""
+    _INDICATOR_CACHE.clear()
+    _IND_CACHE_TS.clear()
+    _CANDLES_CACHE.clear()
+    _CANDLES_CACHE_TS.clear()
+    log.info("[BT] All caches invalidated")
+
+
 # ── CACHE & THREAD MANAGEMENT ────────────────────────────────────────────────
 
 _cache:    dict          = {}
@@ -702,13 +818,13 @@ def _run(period: str, coins_key: str = "BTC"):
             done += n
             _progress[ck] = min(99, int(done / total_steps * 100))
 
-        # Fetch candles
+        # Fetch candles (reutiliza caché global de 4h)
         candles_cache = {}
         for coin, iv in needed:
             key = f"{coin}_{iv}"
             if key not in candles_cache:
-                candles_cache[key] = _fetch_candles(coin, iv, days)
-                time.sleep(0.12)
+                candles_cache[key] = _fetch_candles_cached(coin, iv, days)
+                time.sleep(0.05)
             _upd()
 
         # Backtest EMA/SMA bots (usa simulación del optimizer)

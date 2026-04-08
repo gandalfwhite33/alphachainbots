@@ -1529,6 +1529,9 @@ if __name__ == "__main__":
     backtest_engine._progress.clear()
     backtest_engine._running.clear()
 
+    # Pre-calcular indicadores en background (BTC/ETH/SOL × 5 intervalos)
+    backtest_engine.precalculate_indicators_bg()
+
     sim_engine.start()
 
     port   = int(os.environ.get("PORT", 10000))
