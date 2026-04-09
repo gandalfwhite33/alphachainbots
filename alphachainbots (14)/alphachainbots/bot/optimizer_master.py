@@ -25,7 +25,7 @@ import numpy as np
 import requests
 
 # ─── VERSIÓN Y CONSTANTES ─────────────────────────────────────────────────────
-VERSION        = "master_4.1.0"
+VERSION        = "master_4.2.0"
 INITIAL_EQUITY = 10_000.0
 HL_URL         = "https://api.hyperliquid.xyz/info"
 BINANCE_FUND   = "https://fapi.binance.com/fapi/v1/fundingRate"
@@ -214,7 +214,7 @@ class OptParams:
 
 
 def random_params(rng: random.Random) -> OptParams:
-    ma = rng.choices(MA_PAIRS, weights=[1, 1, 1, 1, 2, 3])[0]
+    ma = rng.choices(MA_PAIRS, weights=[2, 2, 2, 2, 1, 1])[0]
 
     # Limitar filtros activos a máximo 5
     _filter_keys = [
@@ -318,7 +318,7 @@ def perturb(p: OptParams, rng: random.Random) -> OptParams:
         "weekend_exit": WEEKEND_EXIT, "rr_min": RR_MIN_OPTS,
     }
     if key == "ma_pair":
-        ma = rng.choices(MA_PAIRS, weights=[1, 1, 1, 1, 2, 3])[0]
+        ma = rng.choices(MA_PAIRS, weights=[2, 2, 2, 2, 1, 1])[0]
         d["ma_type"] = ma[0]; d["ma_fast"] = ma[1]; d["ma_slow"] = ma[2]
     elif key in opts:
         d[key] = rng.choice(opts[key])
@@ -1536,34 +1536,45 @@ def _struct_key(r: dict) -> tuple:
     return (r.get("coin",""), r.get("direction",""), r.get("interval",""),
             r.get("ma_type",""), r.get("leverage",0))
 
-def _add(r: dict, all_results: list, seen_keys: set,
-         coin_results: Dict[str, list],
-         seen_structs: Optional[Dict[tuple, float]] = None):
+def _add(r: dict, struct_best: Dict[tuple, dict], seen_keys: set):
+    """Añade resultado si es nuevo o mejor que la variante existente.
+    struct_best: dict struct_key → mejor resultado (1 entrada por estructura).
+    Exactamente 1 entrada por (coin, direction, interval, ma_type, leverage)."""
     if not r or r.get("total_trades", 0) == 0: return
     k = _key(r)
     if k in seen_keys: return
     seen_keys.add(k)
-    # Dedup estructural: solo guardar la mejor variante por estructura
     sk = _struct_key(r)
     pnl = r.get("total_pnl_pct", 0.0)
-    if seen_structs is not None:
-        if sk in seen_structs and pnl <= seen_structs[sk]:
-            return  # ya tenemos una variante mejor
-        seen_structs[sk] = pnl
-    all_results.append(r)
-    coin = r.get("coin", "UNK")
-    if coin not in coin_results: coin_results[coin] = []
-    coin_results[coin].append(r)
+    existing = struct_best.get(sk)
+    if existing is not None and existing.get("total_pnl_pct", 0.0) >= pnl:
+        return  # ya tenemos una variante mejor
+    struct_best[sk] = r  # reemplaza la anterior (o inserta nueva)
+
+def _all_results(struct_best: Dict[tuple, dict]) -> List[dict]:
+    """Vista: todos los resultados únicos del struct_best."""
+    return list(struct_best.values())
+
+def _coin_results(struct_best: Dict[tuple, dict]) -> Dict[str, List[dict]]:
+    """Vista: resultados agrupados por moneda."""
+    cr: Dict[str, List[dict]] = {}
+    for r in struct_best.values():
+        coin = r.get("coin", "UNK")
+        if coin not in cr: cr[coin] = []
+        cr[coin].append(r)
+    return cr
 
 
 # ─── CHECKPOINT ───────────────────────────────────────────────────────────────
 def save_checkpoint(path: Path, processed: int,
-                    results: List[dict], coin_results: Dict[str, list]):
+                    struct_best: Dict[tuple, dict]):
+    all_res = _all_results(struct_best)
+    coin_res = _coin_results(struct_best)
     data = {
         "processed":     processed,
-        "results":       sorted(results, key=lambda x: _score(x), reverse=True)[:5000],
+        "results":       sorted(all_res, key=lambda x: _score(x), reverse=True)[:5000],
         "coin_results":  {c: sorted(r, key=lambda x: _score(x), reverse=True)[:300]
-                          for c, r in coin_results.items()},
+                          for c, r in coin_res.items()},
         "timestamp":     datetime.now().isoformat(),
     }
     with open(path, "w", encoding="utf-8") as f:
@@ -1922,21 +1933,28 @@ def main():
     funding = _fetch_funding_rate(); print(f"{funding:.5f}" if funding is not None else "N/A")
 
     processed_start = 0
-    all_results: List[dict] = []
-    coin_results: Dict[str, list] = {c: [] for c in ACTIVE_COINS}
+    struct_best: Dict[tuple, dict] = {}  # struct_key → mejor resultado
     seen_keys: set = set()
-    seen_structs: Dict[tuple, float] = {}  # dedup estructural
 
     if args.resume:
         ckpt = load_checkpoint(ckpt_path)
         if ckpt:
             processed_start = ckpt.get("processed", 0)
-            all_results     = ckpt.get("results", [])
-            for c in ACTIVE_COINS:
-                coin_results[c] = ckpt.get("coin_results", {}).get(c, [])
-            for r in all_results:
+            # Reconstruir struct_best desde checkpoint
+            for r in ckpt.get("results", []):
+                sk = _struct_key(r)
+                existing = struct_best.get(sk)
+                if existing is None or r.get("total_pnl_pct", 0) > existing.get("total_pnl_pct", 0):
+                    struct_best[sk] = r
                 seen_keys.add(_key(r))
-            print(f"[{ts()}] Reanudando: {processed_start:,} combinaciones ya procesadas\n")
+            for c in ACTIVE_COINS:
+                for r in ckpt.get("coin_results", {}).get(c, []):
+                    sk = _struct_key(r)
+                    existing = struct_best.get(sk)
+                    if existing is None or r.get("total_pnl_pct", 0) > existing.get("total_pnl_pct", 0):
+                        struct_best[sk] = r
+                    seen_keys.add(_key(r))
+            print(f"[{ts()}] Reanudando: {processed_start:,} combinaciones, {len(struct_best)} structs únicos\n")
         else:
             print(f"[{ts()}] No se encontro checkpoint — iniciando desde cero\n")
 
@@ -1996,7 +2014,7 @@ def main():
                 print(f"\n[{ts()}] Error pool.map: {e} — continuando…")
                 processed += n_tasks * actual_seg; continue
             for seg in batch:
-                for r in seg: _add(r, all_results, seen_keys, coin_results, seen_structs)
+                for r in seg: _add(r, struct_best, seen_keys)
             processed += sum(t["n"] for t in tasks)
 
             elapsed  = max(time.time() - start_time, 0.001)
@@ -2006,12 +2024,12 @@ def main():
                         else f"{eta_sec/60:.1f}min" if eta_sec >= 60 else f"{eta_sec:.0f}s")
             pct = processed / args.samples * 100.0
             print(f"\r[{ts()}] {processed:>10,}/{args.samples:,} ({pct:5.1f}%) "
-                  f"| {speed:>6,.0f}/s | ETA:{eta_str:>8} | unicos:{len(all_results):,}",
+                  f"| {speed:>6,.0f}/s | ETA:{eta_str:>8} | unicos:{len(struct_best):,}",
                   end="", flush=True)
 
             if processed - last_top_print >= PRINT_TOP_EVERY:
                 last_top_print = processed
-                top5 = [r for r in sorted(all_results, key=lambda x: _score(x), reverse=True)
+                top5 = [r for r in sorted(struct_best.values(), key=lambda x: _score(x), reverse=True)
                         if r.get("total_trades", 0) >= MIN_TRADES_DASHBOARD][:5]
                 print(f"\n[{ts()}] Top 5 (Sharpe, min {MIN_TRADES_DASHBOARD} trades):")
                 for i, r in enumerate(top5):
@@ -2026,13 +2044,13 @@ def main():
 
             if processed - last_ckpt >= CHECKPOINT_EVERY:
                 last_ckpt = processed
-                save_checkpoint(ckpt_path, processed, all_results, coin_results)
+                save_checkpoint(ckpt_path, processed, struct_best)
                 print(f"\n[{ts()}] Checkpoint ({processed:,})\n")
 
     print(f"\n\n[{ts()}] Random search completado.")
 
     # ── Hill climbing ─────────────────────────────────────────────────────────
-    qualified = [r for r in all_results if r.get("total_trades", 0) >= MIN_TRADES_DASHBOARD]
+    qualified = [r for r in struct_best.values() if r.get("total_trades", 0) >= MIN_TRADES_DASHBOARD]
     if qualified:
         sorted_q = sorted(qualified, key=lambda x: _score(x), reverse=True)
         n_seeds  = max(1, min(len(sorted_q) // 5, 2000))
@@ -2048,7 +2066,7 @@ def main():
                                  initargs=initargs) as pool:
             try:
                 for seg in pool.map(_worker_run_hc_segment, hc_tasks):
-                    for r in seg: _add(r, all_results, seen_keys, coin_results, seen_structs)
+                    for r in seg: _add(r, struct_best, seen_keys)
                 processed += len(hc_batch)
             except Exception as e:
                 print(f"\n[{ts()}] Error HC: {e}")
@@ -2056,7 +2074,9 @@ def main():
 
     # ── Outputs ───────────────────────────────────────────────────────────────
     print(f"\n[{ts()}] Generando salidas…")
-    save_checkpoint(ckpt_path, processed, all_results, coin_results)
+    save_checkpoint(ckpt_path, processed, struct_best)
+    all_results = _all_results(struct_best)
+    coin_results = _coin_results(struct_best)
     recommended = save_excel(out_dir, all_results, coin_results, processed) or []
     save_master_bots(out_dir, recommended)
 
