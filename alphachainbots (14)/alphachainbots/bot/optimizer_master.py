@@ -25,7 +25,7 @@ import numpy as np
 import requests
 
 # ─── VERSIÓN Y CONSTANTES ─────────────────────────────────────────────────────
-VERSION        = "master_4.0.0"
+VERSION        = "master_4.1.0"
 INITIAL_EQUITY = 10_000.0
 HL_URL         = "https://api.hyperliquid.xyz/info"
 BINANCE_FUND   = "https://fapi.binance.com/fapi/v1/fundingRate"
@@ -39,7 +39,7 @@ TIMEFRAMES        = ["15m","30m","1h","2h","4h"]
 CHECKPOINT_EVERY = 25_000
 PRINT_TOP_EVERY  = 30_000
 MIN_TRADES_DISPLAY   = 5   # para Excel sheets y TOP_PNL (permite SMA / 4h)
-MIN_TRADES_DASHBOARD = 20  # para master_bots.json y RECOMENDADOS_LIVE
+MIN_TRADES_DASHBOARD = 15  # para master_bots.json y RECOMENDADOS_LIVE
 
 # ─── OPCIONES DE PARÁMETROS (v5/v6/v7 — sin cambios) ─────────────────────────
 MA_PAIRS      = [("ema",8,21),("ema",13,34),("ema",21,55),("ema",20,50),
@@ -214,7 +214,7 @@ class OptParams:
 
 
 def random_params(rng: random.Random) -> OptParams:
-    ma = rng.choice(MA_PAIRS)
+    ma = rng.choices(MA_PAIRS, weights=[1, 1, 1, 1, 2, 3])[0]
 
     # Limitar filtros activos a máximo 5
     _filter_keys = [
@@ -318,7 +318,7 @@ def perturb(p: OptParams, rng: random.Random) -> OptParams:
         "weekend_exit": WEEKEND_EXIT, "rr_min": RR_MIN_OPTS,
     }
     if key == "ma_pair":
-        ma = rng.choice(MA_PAIRS)
+        ma = rng.choices(MA_PAIRS, weights=[1, 1, 1, 1, 2, 3])[0]
         d["ma_type"] = ma[0]; d["ma_fast"] = ma[1]; d["ma_slow"] = ma[2]
     elif key in opts:
         d[key] = rng.choice(opts[key])
@@ -1529,12 +1529,28 @@ def deduplicate(results: List[dict], top_n: int = 30,
             if len(unique) >= top_n: break
     return unique
 
+def _struct_key(r: dict) -> tuple:
+    """Clave estructural: (coin, direction, interval, ma_type, leverage).
+    Dos configs con misma estructura pero filtros distintos son variantes;
+    solo guardamos la mejor."""
+    return (r.get("coin",""), r.get("direction",""), r.get("interval",""),
+            r.get("ma_type",""), r.get("leverage",0))
+
 def _add(r: dict, all_results: list, seen_keys: set,
-         coin_results: Dict[str, list]):
+         coin_results: Dict[str, list],
+         seen_structs: Optional[Dict[tuple, float]] = None):
     if not r or r.get("total_trades", 0) == 0: return
     k = _key(r)
     if k in seen_keys: return
-    seen_keys.add(k); all_results.append(r)
+    seen_keys.add(k)
+    # Dedup estructural: solo guardar la mejor variante por estructura
+    sk = _struct_key(r)
+    pnl = r.get("total_pnl_pct", 0.0)
+    if seen_structs is not None:
+        if sk in seen_structs and pnl <= seen_structs[sk]:
+            return  # ya tenemos una variante mejor
+        seen_structs[sk] = pnl
+    all_results.append(r)
     coin = r.get("coin", "UNK")
     if coin not in coin_results: coin_results[coin] = []
     coin_results[coin].append(r)
@@ -1909,6 +1925,7 @@ def main():
     all_results: List[dict] = []
     coin_results: Dict[str, list] = {c: [] for c in ACTIVE_COINS}
     seen_keys: set = set()
+    seen_structs: Dict[tuple, float] = {}  # dedup estructural
 
     if args.resume:
         ckpt = load_checkpoint(ckpt_path)
@@ -1979,7 +1996,7 @@ def main():
                 print(f"\n[{ts()}] Error pool.map: {e} — continuando…")
                 processed += n_tasks * actual_seg; continue
             for seg in batch:
-                for r in seg: _add(r, all_results, seen_keys, coin_results)
+                for r in seg: _add(r, all_results, seen_keys, coin_results, seen_structs)
             processed += sum(t["n"] for t in tasks)
 
             elapsed  = max(time.time() - start_time, 0.001)
@@ -2031,7 +2048,7 @@ def main():
                                  initargs=initargs) as pool:
             try:
                 for seg in pool.map(_worker_run_hc_segment, hc_tasks):
-                    for r in seg: _add(r, all_results, seen_keys, coin_results)
+                    for r in seg: _add(r, all_results, seen_keys, coin_results, seen_structs)
                 processed += len(hc_batch)
             except Exception as e:
                 print(f"\n[{ts()}] Error HC: {e}")
